@@ -208,6 +208,8 @@ int main(int argc, char* argv[]) {
           type = PacketType::MIDI_NOTE_OFF;
         } else if (msg == 0xB0) {
           type = PacketType::MIDI_CC;
+        } else if (msg == 0xE0) {
+          type = PacketType::MIDI_PITCH_BEND;
         } else {
           return;
         }

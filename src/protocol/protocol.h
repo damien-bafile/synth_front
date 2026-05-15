@@ -16,6 +16,7 @@ enum class PacketType : uint8_t {
   MIDI_NOTE_ON  = 0x90,
   MIDI_NOTE_OFF = 0x91,
   MIDI_CC       = 0x92,
+  MIDI_PITCH_BEND = 0x93,
 };
 
 static constexpr uint8_t SYNC_BYTE = 0xAA;

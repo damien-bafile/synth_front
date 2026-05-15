@@ -22,6 +22,18 @@ static int g_conn_fd = -1;
 static bool g_is_tcp = false;
 static std::mutex g_serial_mutex;
 
+struct MidiEvent {
+  PacketType type;
+  uint8_t channel;
+  uint8_t data1;
+  uint8_t data2;
+};
+
+static constexpr int MIDI_QUEUE_SIZE = 256;
+static MidiEvent g_midi_queue[MIDI_QUEUE_SIZE];
+static std::atomic<int> g_midi_head{0};
+static int g_midi_tail = 0;
+
 // Close a serial or TCP connection by its file descriptor.
 static void conn_close(int fd, bool is_tcp) {
   if (fd >= 0) {
@@ -189,13 +201,18 @@ int main(int argc, char* argv[]) {
       [](uint8_t status, uint8_t data1, uint8_t data2) {
         uint8_t channel = status & 0x0F;
         uint8_t msg = status & 0xF0;
+        PacketType type;
         if (msg == 0x90 && data2 > 0) {
-          send_midi(g_conn_fd, PacketType::MIDI_NOTE_ON, channel, data1, data2);
+          type = PacketType::MIDI_NOTE_ON;
         } else if (msg == 0x80 || (msg == 0x90 && data2 == 0)) {
-          send_midi(g_conn_fd, PacketType::MIDI_NOTE_OFF, channel, data1, data2);
+          type = PacketType::MIDI_NOTE_OFF;
         } else if (msg == 0xB0) {
-          send_midi(g_conn_fd, PacketType::MIDI_CC, channel, data1, data2);
+          type = PacketType::MIDI_CC;
+        } else {
+          return;
         }
+        int idx = g_midi_head.fetch_add(1, std::memory_order_relaxed) % MIDI_QUEUE_SIZE;
+        g_midi_queue[idx] = {type, channel, data1, data2};
       });
 
   SDL_Init(SDL_INIT_VIDEO);
@@ -247,6 +264,12 @@ int main(int argc, char* argv[]) {
         default:
           break;
       }
+    }
+
+    while (g_midi_tail != g_midi_head.load(std::memory_order_acquire)) {
+      MidiEvent& e = g_midi_queue[g_midi_tail % MIDI_QUEUE_SIZE];
+      send_midi(g_conn_fd, e.type, e.channel, e.data1, e.data2);
+      g_midi_tail++;
     }
 
     if (framebuffer_get(fb_rgb565, &fb_w, &fb_h)) {

@@ -3,9 +3,9 @@
 #include <atomic>
 
 static constexpr int MAX_FB_PIXELS = 320 * 480;
-static constexpr int FB_RGB888_SIZE = MAX_FB_PIXELS * 3;
+static constexpr int FB_RGB565_SIZE = MAX_FB_PIXELS * 2;
 
-static uint8_t g_fb[2][FB_RGB888_SIZE];
+static uint8_t g_fb[2][FB_RGB565_SIZE];
 static int g_cur = 0;
 static int g_width = 0;
 static int g_height = 0;
@@ -24,16 +24,12 @@ bool framebuffer_init(int width, int height) {
 }
 
 void framebuffer_write_tile(int tx, int ty, int tw, int th, const uint8_t* rgb565_data) {
-  const uint16_t* src = reinterpret_cast<const uint16_t*>(rgb565_data);
+  int row_bytes = tw * 2;
+  const uint8_t* src = rgb565_data;
   for (int y = 0; y < th; y++) {
-    int src_offs = y * tw;
-    int dst_offs = ((ty + y) * g_width + tx) * 3;
-    for (int x = 0; x < tw; x++) {
-      uint16_t p = src[src_offs + x];
-      g_fb[g_cur][dst_offs + x * 3 + 0] = ((p >> 11) & 0x1F) << 3;
-      g_fb[g_cur][dst_offs + x * 3 + 1] = ((p >> 5)  & 0x3F) << 2;
-      g_fb[g_cur][dst_offs + x * 3 + 2] = ( p        & 0x1F) << 3;
-    }
+    int dst_offs = ((ty + y) * g_width + tx) * 2;
+    std::memcpy(g_fb[g_cur] + dst_offs, src, row_bytes);
+    src += row_bytes;
   }
 }
 
@@ -46,8 +42,7 @@ void framebuffer_finish_frame() {
 bool framebuffer_get(uint8_t* out, int* out_width, int* out_height) {
   int idx = g_done.exchange(-1, std::memory_order_acquire);
   if (idx < 0) return false;
-  int bytes = g_width * g_height * 3;
-  std::memcpy(out, g_fb[idx], bytes);
+  std::memcpy(out, g_fb[idx], g_width * g_height * 2);
   *out_width = g_width;
   *out_height = g_height;
   return true;

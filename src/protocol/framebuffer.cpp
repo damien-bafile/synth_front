@@ -14,10 +14,12 @@ static std::atomic<int> g_done{-1};
 bool framebuffer_init(int width, int height) {
   int pixels = width * height;
   if (pixels > MAX_FB_PIXELS) return false;
-  g_width = width;
-  g_height = height;
-  g_cur = 0;
-  g_done.store(-1, std::memory_order_release);
+  if (width != g_width || height != g_height) {
+    g_width = width;
+    g_height = height;
+    g_cur = 0;
+    g_done.store(-1, std::memory_order_release);
+  }
   return true;
 }
 

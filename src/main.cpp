@@ -211,8 +211,9 @@ int main(int argc, char* argv[]) {
         } else {
           return;
         }
-        int idx = g_midi_head.fetch_add(1, std::memory_order_relaxed) % MIDI_QUEUE_SIZE;
-        g_midi_queue[idx] = {type, channel, data1, data2};
+        int slot = g_midi_head.load(std::memory_order_relaxed);
+        g_midi_queue[slot % MIDI_QUEUE_SIZE] = {type, channel, data1, data2};
+        g_midi_head.store(slot + 1, std::memory_order_release);
       });
 
   SDL_Init(SDL_INIT_VIDEO);
@@ -266,10 +267,13 @@ int main(int argc, char* argv[]) {
       }
     }
 
-    while (g_midi_tail != g_midi_head.load(std::memory_order_acquire)) {
-      MidiEvent& e = g_midi_queue[g_midi_tail % MIDI_QUEUE_SIZE];
-      send_midi(g_conn_fd, e.type, e.channel, e.data1, e.data2);
-      g_midi_tail++;
+    {
+      int head = g_midi_head.load(std::memory_order_acquire);
+      while (g_midi_tail != head) {
+        MidiEvent& e = g_midi_queue[g_midi_tail % MIDI_QUEUE_SIZE];
+        send_midi(g_conn_fd, e.type, e.channel, e.data1, e.data2);
+        g_midi_tail++;
+      }
     }
 
     if (framebuffer_get(fb_rgb565, &fb_w, &fb_h)) {

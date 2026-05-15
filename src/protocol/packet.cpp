@@ -1,12 +1,14 @@
 #include "protocol.h"
 #include "../serial/serial_port.h"
 
+// XOR-based checksum over a byte range.
 static uint8_t compute_checksum(const uint8_t* data, int len) {
   uint8_t sum = 0;
   for (int i = 0; i < len; i++) sum ^= data[i];
   return sum;
 }
 
+// Build a binary packet: SYNC | type | 4B BE length | payload | xor_checksum.
 std::vector<uint8_t> packet_encode(PacketType type, const uint8_t* payload, size_t len) {
   std::vector<uint8_t> buf;
   buf.reserve(7 + len);
@@ -21,6 +23,7 @@ std::vector<uint8_t> packet_encode(PacketType type, const uint8_t* payload, size
   return buf;
 }
 
+// Try to parse one complete packet from buf; returns total bytes consumed, 0 (incomplete), or -1 (corrupt).
 int packet_parse(const uint8_t* buf, int len, Packet* out) {
   if (len < 7) return 0;
   if (buf[0] != SYNC_BYTE) return -1;
@@ -39,6 +42,7 @@ int packet_parse(const uint8_t* buf, int len, Packet* out) {
   return total_len;
 }
 
+// Encode and send a packet over the connection (serial or TCP).
 void packet_send(int fd, PacketType type, const uint8_t* payload, size_t len) {
   auto data = packet_encode(type, payload, len);
   serial_write(fd, data.data(), (int)data.size());

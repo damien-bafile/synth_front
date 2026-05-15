@@ -28,6 +28,7 @@ static int g_render_fps = 0;
 static Uint64 g_fps_last = 0;
 static int g_fps_count = 0;
 
+// Close a serial or TCP connection by its file descriptor.
 static void conn_close(int fd, bool is_tcp) {
   if (fd >= 0) {
     if (is_tcp) tcp_close(fd);
@@ -35,11 +36,13 @@ static void conn_close(int fd, bool is_tcp) {
   }
 }
 
+// Send a key-down or key-up event to the connected device.
 static void send_key(int fd, uint8_t keycode, bool down) {
   std::lock_guard<std::mutex> lock(g_serial_mutex);
   packet_send(fd, down ? PacketType::KEY_DOWN : PacketType::KEY_UP, &keycode, 1);
 }
 
+// Return a 2-char human-readable label for a Teensy keycode, or nullptr if unknown.
 static const char* key_name_short(uint8_t kc) {
   switch (kc) {
     case 0x01: return "UP";
@@ -71,6 +74,7 @@ static const char* key_name_short(uint8_t kc) {
   }
 }
 
+// Build a "A+B+C" string of currently held keys for the UI overlay.
 static void build_keys_string(char* buf, int bufsz) {
   buf[0] = '\0';
   for (int kc = 0; kc < 256; kc++) {
@@ -86,6 +90,7 @@ static void build_keys_string(char* buf, int bufsz) {
   }
 }
 
+// Convert an RGB565 pixel buffer to RGB888 for OpenGL texture upload.
 static void convert_rgb565_to_rgb888(const uint8_t* src, uint8_t* dst, int pixels) {
   const uint16_t* s = reinterpret_cast<const uint16_t*>(src);
   for (int i = 0; i < pixels; i++) {
@@ -96,6 +101,7 @@ static void convert_rgb565_to_rgb888(const uint8_t* src, uint8_t* dst, int pixel
   }
 }
 
+// Background thread: read packets from serial/TCP, parse frame tiles and debug messages.
 static void serial_thread_func() {
   static uint8_t buf[65536];
   int buf_len = 0;
@@ -165,6 +171,7 @@ static void serial_thread_func() {
   }
 }
 
+// Entry point: open serial/TCP, set up SDL/OpenGL window, run render loop with key handling.
 int main(int argc, char* argv[]) {
   bool use_tcp = false;
   std::string port;

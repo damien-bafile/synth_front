@@ -10,6 +10,7 @@
 #include <IOKit/serial/ioss.h>
 #endif
 
+// Convert a numeric baud rate to a termios speed_t constant.
 static speed_t baud_to_speed(int baud) {
   switch (baud) {
     case 0:       return B0;
@@ -35,6 +36,7 @@ static speed_t baud_to_speed(int baud) {
   }
 }
 
+// Open and configure a serial device (8N1, raw mode) at the given baud rate.
 int serial_open(const char* device, int baud) {
   int fd = open(device, O_RDWR | O_NOCTTY);
   if (fd < 0) {
@@ -81,16 +83,19 @@ int serial_open(const char* device, int baud) {
   return fd;
 }
 
+// Close the serial port file descriptor.
 void serial_close(int fd) {
   if (fd >= 0) close(fd);
 }
 
+// Read from serial port; returns 0 on EAGAIN instead of -1.
 int serial_read(int fd, uint8_t* buf, int len) {
   int n = read(fd, buf, len);
   if (n < 0 && errno == EAGAIN) return 0;
   return n;
 }
 
+// Write bytes to the serial port; returns result of write().
 int serial_write(int fd, const uint8_t* buf, int len) {
   return write(fd, buf, len);
 }

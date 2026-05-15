@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <stdio.h>
 
+// Create a TCP socket and connect to host:port; returns fd or -1 on error.
 int tcp_connect(const char* host, int port) {
   int fd = socket(AF_INET, SOCK_STREAM, 0);
   if (fd < 0) {
@@ -31,6 +32,7 @@ int tcp_connect(const char* host, int port) {
   return fd;
 }
 
+// Close the TCP connection.
 void tcp_close(int fd) {
   if (fd >= 0) close(fd);
 }

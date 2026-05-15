@@ -1,5 +1,6 @@
 #include "input.h"
 
+// Map SDL keycodes to Teensy protocol key identifiers (0x01–0x64).
 uint8_t input_map_key(SDL_Keycode key) {
   switch (key) {
     case SDLK_UP:       return 0x01;

@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <vector>
 
+// Binary packet type identifiers shared between synth_front and Teensy.
 enum class PacketType : uint8_t {
   KEY_DOWN = 0x01,
   KEY_UP   = 0x02,
@@ -15,13 +16,17 @@ enum class PacketType : uint8_t {
 
 static constexpr uint8_t SYNC_BYTE = 0xAA;
 
+// Parsed binary packet: a type code and its payload bytes.
 struct Packet {
   PacketType type;
   std::vector<uint8_t> payload;
 };
 
+// Serialize a type + payload into a binary packet with sync byte and XOR checksum.
 std::vector<uint8_t> packet_encode(PacketType type, const uint8_t* payload, size_t len);
 
+// Parse a buffer for the next complete packet; returns bytes consumed, 0 (need more), or -1 (bad).
 int packet_parse(const uint8_t* buf, int len, Packet* out);
 
+// Encode a packet and write it to a file descriptor (serial or TCP).
 void packet_send(int fd, PacketType type, const uint8_t* payload, size_t len);

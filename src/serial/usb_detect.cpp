@@ -2,6 +2,7 @@
 #include <dirent.h>
 #include <cstring>
 
+// Enumerate /dev/cu.* devices (macOS callout serial ports).
 std::vector<std::string> find_serial_ports() {
   std::vector<std::string> ports;
   DIR* dir = opendir("/dev");
@@ -17,6 +18,7 @@ std::vector<std::string> find_serial_ports() {
   return ports;
 }
 
+// Locate the first Teensy (usbmodem) serial port, or return empty string.
 std::string find_teensy_port() {
   auto ports = find_serial_ports();
   for (const auto& p : ports) {

@@ -30,6 +30,7 @@ void main() {
 }
 )";
 
+// Compile a vertex or fragment shader from GLSL source; logs errors to stderr.
 static unsigned int compile_shader(unsigned int type, const char* src) {
   unsigned int shader = glCreateShader(type);
   glShaderSource(shader, 1, &src, nullptr);
@@ -45,6 +46,7 @@ static unsigned int compile_shader(unsigned int type, const char* src) {
   return shader;
 }
 
+// Initialise OpenGL: create context, compile/link shaders, set up full-screen quad VAO and texture.
 bool renderer_init(Renderer* r, SDL_Window* window) {
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
@@ -115,6 +117,7 @@ bool renderer_init(Renderer* r, SDL_Window* window) {
   return true;
 }
 
+// Tear down all OpenGL resources.
 void renderer_destroy(Renderer* r) {
   if (r->gl_ctx) {
     glDeleteTextures(1, &r->texture);
@@ -126,6 +129,7 @@ void renderer_destroy(Renderer* r) {
   }
 }
 
+// Upload an RGB888 pixel buffer to the GL texture; re-allocates if dimensions change.
 void renderer_upload_frame(Renderer* r, const uint8_t* data, int width, int height) {
   glBindTexture(GL_TEXTURE_2D, r->texture);
   if (width == r->tex_width && height == r->tex_height) {
@@ -137,6 +141,7 @@ void renderer_upload_frame(Renderer* r, const uint8_t* data, int width, int heig
   }
 }
 
+// Render the textured quad with aspect-correct letterboxing into the window.
 void renderer_draw(Renderer* r, int window_width, int window_height) {
   glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
   glClear(GL_COLOR_BUFFER_BIT);

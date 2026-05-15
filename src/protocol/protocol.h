@@ -12,6 +12,10 @@ enum class PacketType : uint8_t {
   DEBUG = 0x82,
   READY = 0x83,
   FRAME_TILE = 0x88,
+
+  MIDI_NOTE_ON  = 0x90,
+  MIDI_NOTE_OFF = 0x91,
+  MIDI_CC       = 0x92,
 };
 
 static constexpr uint8_t SYNC_BYTE = 0xAA;

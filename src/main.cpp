@@ -12,7 +12,7 @@
 #include "protocol/framebuffer.h"
 #include "render/renderer.h"
 #include "input/input.h"
-#include <ui.h>
+#include "midi/midi_input.h"
 
 static constexpr int FB_RGB565_SIZE = 320 * 480 * 2;
 static constexpr int FB_RGB888_SIZE = 320 * 480 * 3;
@@ -21,12 +21,6 @@ static std::atomic<bool> g_running{true};
 static int g_conn_fd = -1;
 static bool g_is_tcp = false;
 static std::mutex g_serial_mutex;
-
-static bool g_keys_held[256];
-
-static int g_render_fps = 0;
-static Uint64 g_fps_last = 0;
-static int g_fps_count = 0;
 
 // Close a serial or TCP connection by its file descriptor.
 static void conn_close(int fd, bool is_tcp) {
@@ -42,52 +36,11 @@ static void send_key(int fd, uint8_t keycode, bool down) {
   packet_send(fd, down ? PacketType::KEY_DOWN : PacketType::KEY_UP, &keycode, 1);
 }
 
-// Return a 2-char human-readable label for a Teensy keycode, or nullptr if unknown.
-static const char* key_name_short(uint8_t kc) {
-  switch (kc) {
-    case 0x01: return "UP";
-    case 0x02: return "DN";
-    case 0x03: return "LT";
-    case 0x04: return "RT";
-    case 0x10: return "EN";
-    case 0x11: return "SP";
-    case 0x12: return "ES";
-    case 0x13: return "TB";
-    case 0x14: return "BS";
-    case 0x15: return "DL";
-    case 0x20: return "Q"; case 0x21: return "W"; case 0x22: return "E";
-    case 0x23: return "R"; case 0x24: return "T"; case 0x25: return "Y";
-    case 0x26: return "U"; case 0x27: return "I"; case 0x28: return "O";
-    case 0x29: return "P";
-    case 0x30: return "A"; case 0x31: return "S"; case 0x32: return "D";
-    case 0x33: return "F"; case 0x34: return "G"; case 0x35: return "H";
-    case 0x36: return "J"; case 0x37: return "K"; case 0x38: return "L";
-    case 0x40: return "Z"; case 0x41: return "X"; case 0x42: return "C";
-    case 0x43: return "V"; case 0x44: return "B"; case 0x45: return "N";
-    case 0x46: return "M";
-    case 0x50: return "1"; case 0x51: return "2"; case 0x52: return "3";
-    case 0x53: return "4"; case 0x54: return "5"; case 0x55: return "6";
-    case 0x56: return "7"; case 0x57: return "8";
-    case 0x60: return "F1"; case 0x61: return "F2"; case 0x62: return "F3";
-    case 0x63: return "F4"; case 0x64: return "F5";
-    default: return nullptr;
-  }
-}
-
-// Build a "A+B+C" string of currently held keys for the UI overlay.
-static void build_keys_string(char* buf, int bufsz) {
-  buf[0] = '\0';
-  for (int kc = 0; kc < 256; kc++) {
-    if (!g_keys_held[kc]) continue;
-    const char* name = key_name_short(kc);
-    if (!name) continue;
-    int len = (int)std::strlen(buf);
-    int nlen = (int)std::strlen(name);
-    if (len > 0) buf[len++] = '+';
-    if (len + nlen >= bufsz) break;
-    std::memcpy(buf + len, name, nlen);
-    buf[len + nlen] = '\0';
-  }
+// Send a MIDI packet to the connected device.
+static void send_midi(int fd, PacketType type, uint8_t channel, uint8_t data1, uint8_t data2) {
+  uint8_t payload[3] = {channel, data1, data2};
+  std::lock_guard<std::mutex> lock(g_serial_mutex);
+  packet_send(fd, type, payload, 3);
 }
 
 // Convert an RGB565 pixel buffer to RGB888 for OpenGL texture upload.
@@ -177,6 +130,7 @@ int main(int argc, char* argv[]) {
   std::string port;
   std::string host = "127.0.0.1";
   int tcp_port = 9877;
+  std::string midi_source;
 
   for (int i = 1; i < argc; i++) {
     if (std::strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
@@ -189,6 +143,15 @@ int main(int argc, char* argv[]) {
         host = addr.substr(0, colon);
         tcp_port = std::stoi(addr.substr(colon + 1));
       }
+    } else if (std::strcmp(argv[i], "--list-midi") == 0) {
+      auto sources = midi_input_list_sources();
+      fprintf(stderr, "MIDI input sources:\n");
+      for (const auto& s : sources) {
+        fprintf(stderr, "  %s\n", s.c_str());
+      }
+      return 0;
+    } else if (std::strcmp(argv[i], "--midi-source") == 0 && i + 1 < argc) {
+      midi_source = argv[++i];
     }
   }
 
@@ -220,12 +183,28 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  MidiInput midi_in{};
+  midi_input_open(&midi_in,
+      midi_source.empty() ? nullptr : midi_source.c_str(),
+      [](uint8_t status, uint8_t data1, uint8_t data2) {
+        uint8_t channel = status & 0x0F;
+        uint8_t msg = status & 0xF0;
+        if (msg == 0x90 && data2 > 0) {
+          send_midi(g_conn_fd, PacketType::MIDI_NOTE_ON, channel, data1, data2);
+        } else if (msg == 0x80 || (msg == 0x90 && data2 == 0)) {
+          send_midi(g_conn_fd, PacketType::MIDI_NOTE_OFF, channel, data1, data2);
+        } else if (msg == 0xB0) {
+          send_midi(g_conn_fd, PacketType::MIDI_CC, channel, data1, data2);
+        }
+      });
+
   SDL_Init(SDL_INIT_VIDEO);
 
   SDL_Window* window = SDL_CreateWindow("synth front", 640, 960,
     SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
   if (!window) {
     fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
+    midi_input_close(&midi_in);
     conn_close(g_conn_fd, g_is_tcp);
     SDL_Quit();
     return 1;
@@ -233,6 +212,7 @@ int main(int argc, char* argv[]) {
 
   Renderer renderer;
   if (!renderer_init(&renderer, window)) {
+    midi_input_close(&midi_in);
     conn_close(g_conn_fd, g_is_tcp);
     SDL_DestroyWindow(window);
     SDL_Quit();
@@ -259,7 +239,6 @@ int main(int argc, char* argv[]) {
           if (!event.key.repeat) {
             uint8_t kc = input_map_key(event.key.key);
             if (kc != 0) {
-              g_keys_held[kc] = (event.type == SDL_EVENT_KEY_DOWN);
               send_key(g_conn_fd, kc, event.type == SDL_EVENT_KEY_DOWN);
             }
           }
@@ -271,30 +250,6 @@ int main(int argc, char* argv[]) {
     }
 
     if (framebuffer_get(fb_rgb565, &fb_w, &fb_h)) {
-      ui_fb_t fb = { fb_rgb565, fb_w, fb_h };
-
-      ui_fill_rect(&fb, 0, 0, fb_w, 14, UI_BG_DARK);
-
-      char keys_buf[64];
-      build_keys_string(keys_buf, (int)sizeof(keys_buf));
-      if (keys_buf[0]) {
-        ui_draw_text(&fb, 2, 2, keys_buf, UI_ACCENT_2, UI_BG_DARK);
-      }
-
-      char status[32];
-      std::snprintf(status, sizeof(status), "%s  %d fps",
-                    g_is_tcp ? "TCP" : "USB", g_render_fps);
-      int sw = ui_text_width(status);
-      ui_draw_text(&fb, fb_w - sw - 4, 2, status, UI_TEXT_DIM, UI_BG_DARK);
-
-      g_fps_count++;
-      Uint64 now = SDL_GetTicks();
-      if (now - g_fps_last >= 1000) {
-        g_render_fps = g_fps_count;
-        g_fps_count = 0;
-        g_fps_last = now;
-      }
-
       static uint8_t fb_rgb888[FB_RGB888_SIZE];
       convert_rgb565_to_rgb888(fb_rgb565, fb_rgb888, fb_w * fb_h);
       renderer_upload_frame(&renderer, fb_rgb888, fb_w, fb_h);
@@ -309,6 +264,7 @@ int main(int argc, char* argv[]) {
   g_running.store(false, std::memory_order_release);
   serial_thread.join();
 
+  midi_input_close(&midi_in);
   conn_close(g_conn_fd, g_is_tcp);
 
   renderer_destroy(&renderer);

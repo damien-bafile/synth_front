@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/daimyo/Dev/teensy/build/cmake_install.cmake",
+		"/Users/daimyo/Dev/teensy/deps/sdl3-build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

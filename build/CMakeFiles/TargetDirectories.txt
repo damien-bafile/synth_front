@@ -1,0 +1,7 @@
+/Users/daimyo/Dev/teensy/build/CMakeFiles/teensy.dir
+/Users/daimyo/Dev/teensy/build/CMakeFiles/edit_cache.dir
+/Users/daimyo/Dev/teensy/build/CMakeFiles/rebuild_cache.dir
+/Users/daimyo/Dev/teensy/deps/sdl3-build/CMakeFiles/SDL3-static.dir
+/Users/daimyo/Dev/teensy/deps/sdl3-build/CMakeFiles/SDL3_test.dir
+/Users/daimyo/Dev/teensy/deps/sdl3-build/CMakeFiles/edit_cache.dir
+/Users/daimyo/Dev/teensy/deps/sdl3-build/CMakeFiles/rebuild_cache.dir

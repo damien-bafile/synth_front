@@ -78,13 +78,13 @@ bool renderer_init(Renderer* r, SDL_Window* window) {
   }
 
   float vertices[] = {
-    -1.0f,  1.0f,  0.0f, 1.0f,
-    -1.0f, -1.0f,  0.0f, 0.0f,
-     1.0f, -1.0f,  1.0f, 0.0f,
+    -1.0f,  1.0f,  0.0f, 0.0f,
+    -1.0f, -1.0f,  0.0f, 1.0f,
+     1.0f, -1.0f,  1.0f, 1.0f,
 
-    -1.0f,  1.0f,  0.0f, 1.0f,
-     1.0f, -1.0f,  1.0f, 0.0f,
-     1.0f,  1.0f,  1.0f, 1.0f,
+    -1.0f,  1.0f,  0.0f, 0.0f,
+     1.0f, -1.0f,  1.0f, 1.0f,
+     1.0f,  1.0f,  1.0f, 0.0f,
   };
 
   glGenVertexArrays(1, &r->vao);

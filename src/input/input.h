@@ -2,5 +2,12 @@
 #include <SDL3/SDL.h>
 #include <cstdint>
 
-// Map an SDL physical keycode to the Teensy protocol key code (1-byte).
-uint8_t input_map_key(SDL_Keycode key);
+enum class InputAction { KEY, TRANSPORT, NOTE, ENCODER };
+
+struct InputResult {
+    InputAction action;
+    uint8_t value;
+    int16_t encoder_delta;
+};
+
+InputResult input_map_key(SDL_Keycode key, bool shift);

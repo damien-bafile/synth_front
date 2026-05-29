@@ -7,6 +7,7 @@ enum class PacketType : uint8_t {
   KEY_DOWN = 0x01,
   KEY_UP   = 0x02,
   PING     = 0x04,
+  ENCODER  = 0x05,
 
   FRAME = 0x81,
   DEBUG = 0x82,
@@ -17,6 +18,10 @@ enum class PacketType : uint8_t {
   MIDI_NOTE_OFF = 0x91,
   MIDI_CC       = 0x92,
   MIDI_PITCH_BEND = 0x93,
+
+  MIDI_START    = 0xFA,
+  MIDI_CONTINUE = 0xFB,
+  MIDI_STOP     = 0xFC,
 };
 
 static constexpr uint8_t SYNC_BYTE = 0xAA;
@@ -35,3 +40,9 @@ int packet_parse(const uint8_t* buf, int len, Packet* out);
 
 // Encode a packet and write it to a file descriptor (serial or TCP).
 void packet_send(int fd, PacketType type, const uint8_t* payload, size_t len);
+
+// Send an encoder delta packet: [index, delta_hi, delta_lo].
+void packet_send_encoder(int fd, uint8_t index, int16_t delta);
+
+// Send a transport packet (START/CONTINUE/STOP) with zero-length payload.
+void packet_send_transport(int fd, PacketType type);

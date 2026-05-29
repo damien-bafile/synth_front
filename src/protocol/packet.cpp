@@ -47,3 +47,12 @@ void packet_send(int fd, PacketType type, const uint8_t* payload, size_t len) {
   auto data = packet_encode(type, payload, len);
   serial_write(fd, data.data(), (int)data.size());
 }
+
+void packet_send_encoder(int fd, uint8_t index, int16_t delta) {
+  uint8_t payload[3] = { index, (uint8_t)((delta >> 8) & 0xFF), (uint8_t)(delta & 0xFF) };
+  packet_send(fd, PacketType::ENCODER, payload, 3);
+}
+
+void packet_send_transport(int fd, PacketType type) {
+  packet_send(fd, type, nullptr, 0);
+}

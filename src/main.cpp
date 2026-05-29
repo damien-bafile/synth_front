@@ -55,6 +55,23 @@ static void send_midi(int fd, PacketType type, uint8_t channel, uint8_t data1, u
   packet_send(fd, type, payload, 3);
 }
 
+// Send a transport packet (START/CONTINUE/STOP) to the connected device.
+static void send_transport(int fd, PacketType type) {
+  std::lock_guard<std::mutex> lock(g_serial_mutex);
+  packet_send_transport(fd, type);
+}
+
+// Send a MIDI note on/off to the connected device (channel 0).
+static void send_midi_note(int fd, uint8_t note, bool on) {
+  send_midi(fd, on ? PacketType::MIDI_NOTE_ON : PacketType::MIDI_NOTE_OFF, 0, note, on ? 127 : 0);
+}
+
+// Send an encoder delta to the connected device.
+static void send_encoder(int fd, uint8_t index, int16_t delta) {
+  std::lock_guard<std::mutex> lock(g_serial_mutex);
+  packet_send_encoder(fd, index, delta);
+}
+
 // Convert an RGB565 pixel buffer to RGB888 for OpenGL texture upload.
 static void convert_rgb565_to_rgb888(const uint8_t* src, uint8_t* dst, int pixels) {
   const uint16_t* s = reinterpret_cast<const uint16_t*>(src);
@@ -210,6 +227,15 @@ int main(int argc, char* argv[]) {
           type = PacketType::MIDI_CC;
         } else if (msg == 0xE0) {
           type = PacketType::MIDI_PITCH_BEND;
+        } else if (status == 0xFA) {
+          send_transport(g_conn_fd, PacketType::MIDI_START);
+          return;
+        } else if (status == 0xFB) {
+          send_transport(g_conn_fd, PacketType::MIDI_CONTINUE);
+          return;
+        } else if (status == 0xFC) {
+          send_transport(g_conn_fd, PacketType::MIDI_STOP);
+          return;
         } else {
           return;
         }
@@ -256,11 +282,29 @@ int main(int argc, char* argv[]) {
           break;
         case SDL_EVENT_KEY_DOWN:
         case SDL_EVENT_KEY_UP: {
-          if (!event.key.repeat) {
-            uint8_t kc = input_map_key(event.key.key);
-            if (kc != 0) {
-              send_key(g_conn_fd, kc, event.type == SDL_EVENT_KEY_DOWN);
-            }
+          bool down = (event.type == SDL_EVENT_KEY_DOWN);
+          auto mod = SDL_GetModState();
+          auto result = input_map_key(event.key.key, (mod & SDL_KMOD_SHIFT) != 0);
+
+          bool is_encoder = (result.action == InputAction::ENCODER);
+          if (event.key.repeat && !is_encoder) break;
+          if (!down && (is_encoder || result.action == InputAction::TRANSPORT)) break;
+
+          switch (result.action) {
+            case InputAction::KEY:
+              send_key(g_conn_fd, result.value, down);
+              break;
+            case InputAction::TRANSPORT:
+              send_transport(g_conn_fd, static_cast<PacketType>(result.value));
+              break;
+            case InputAction::NOTE:
+              send_midi_note(g_conn_fd, result.value, down);
+              break;
+            case InputAction::ENCODER:
+              if (result.encoder_delta != 0) {
+                send_encoder(g_conn_fd, result.value, result.encoder_delta);
+              }
+              break;
           }
           break;
         }

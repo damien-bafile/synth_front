@@ -1,6 +1,13 @@
 #include "midi_input.h"
+#include <CoreMIDI/CoreMIDI.h>
 #include <cstdio>
 #include <cstring>
+
+struct CoreMidiBackend {
+    MIDIClientRef client = 0;
+    MIDIEndpointRef endpoint = 0;
+    MIDIPortRef port = 0;
+};
 
 static void midi_read_callback(const MIDIPacketList* pktlist, void* readProcRefCon, void*) {
     MidiCallback* cb = reinterpret_cast<MidiCallback*>(readProcRefCon);
@@ -17,9 +24,8 @@ static void midi_read_callback(const MIDIPacketList* pktlist, void* readProcRefC
 }
 
 bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
-    m->client = 0;
-    m->endpoint = 0;
-    m->port = 0;
+    auto* b = new CoreMidiBackend;
+    m->opaque = b;
     m->cb = nullptr;
     m->running = false;
 
@@ -28,9 +34,11 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
     OSStatus err = MIDIClientCreate(name, nullptr, nullptr, &client);
     if (err != noErr) {
         fprintf(stderr, "MIDI: failed to create client (err %d)\n", (int)err);
+        delete b;
+        m->opaque = nullptr;
         return false;
     }
-    m->client = client;
+    b->client = client;
 
     auto* cb_ptr = new MidiCallback(std::move(cb));
     m->cb = cb_ptr;
@@ -42,10 +50,11 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
         delete cb_ptr;
         m->cb = nullptr;
         MIDIClientDispose(client);
-        m->client = 0;
+        delete b;
+        m->opaque = nullptr;
         return false;
     }
-    m->port = port;
+    b->port = port;
 
     ItemCount n = MIDIGetNumberOfSources();
     MIDIEndpointRef found = 0;
@@ -70,21 +79,21 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
     if (!found) {
         fprintf(stderr, "MIDI: no matching source found, running without MIDI input.\n");
         MIDIPortDispose(port);
-        m->port = 0;
+        b->port = 0;
         m->running = true;
         return true;
     }
 
-    m->endpoint = found;
+    b->endpoint = found;
     err = MIDIPortConnectSource(port, found, nullptr);
     if (err != noErr) {
         fprintf(stderr, "MIDI: failed to connect source (err %d)\n", (int)err);
         delete cb_ptr;
         m->cb = nullptr;
         MIDIPortDispose(port);
-        m->port = 0;
         MIDIClientDispose(client);
-        m->client = 0;
+        delete b;
+        m->opaque = nullptr;
         return false;
     }
 
@@ -93,21 +102,24 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
 }
 
 void midi_input_close(MidiInput* m) {
-    if (m->port) {
-        if (m->endpoint) {
-            MIDIPortDisconnectSource(m->port, m->endpoint);
+    auto* b = static_cast<CoreMidiBackend*>(m->opaque);
+    if (!b) return;
+
+    if (b->port) {
+        if (b->endpoint) {
+            MIDIPortDisconnectSource(b->port, b->endpoint);
         }
-        MIDIPortDispose(m->port);
-        m->port = 0;
+        MIDIPortDispose(b->port);
     }
-    if (m->client) {
-        MIDIClientDispose(m->client);
-        m->client = 0;
+    if (b->client) {
+        MIDIClientDispose(b->client);
     }
     if (m->cb) {
         delete m->cb;
         m->cb = nullptr;
     }
+    delete b;
+    m->opaque = nullptr;
     m->running = false;
 }
 

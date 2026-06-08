@@ -13,6 +13,7 @@
 #include "render/renderer.h"
 #include "input/input.h"
 #include "midi/midi_input.h"
+#include "audio/audio.h"
 
 static constexpr int FB_RGB565_SIZE = 320 * 480 * 2;
 static constexpr int FB_RGB888_SIZE = 320 * 480 * 3;
@@ -244,7 +245,7 @@ int main(int argc, char* argv[]) {
         g_midi_head.store(slot + 1, std::memory_order_release);
       });
 
-  SDL_Init(SDL_INIT_VIDEO);
+  SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
   SDL_Window* window = SDL_CreateWindow("synth front", 640, 960,
     SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
@@ -266,6 +267,8 @@ int main(int argc, char* argv[]) {
   }
 
   framebuffer_init(320, 480);
+
+  audio_init();
 
   std::thread serial_thread(serial_thread_func);
 
@@ -339,6 +342,8 @@ int main(int argc, char* argv[]) {
 
   midi_input_close(&midi_in);
   conn_close(g_conn_fd, g_is_tcp);
+
+  audio_shutdown();
 
   renderer_destroy(&renderer);
   SDL_DestroyWindow(window);

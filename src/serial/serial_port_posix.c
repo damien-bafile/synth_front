@@ -8,6 +8,9 @@
 #ifdef __APPLE__
 #include <sys/ioctl.h>
 #include <IOKit/serial/ioss.h>
+#elif defined(__linux__)
+#include <sys/ioctl.h>
+#include <asm/termbits.h>
 #endif
 
 // Convert a numeric baud rate to a termios speed_t constant.
@@ -72,13 +75,26 @@ int serial_open(const char* device, int baud) {
     return -1;
   }
 
-#ifdef __APPLE__
   if (baud > 230400) {
+#ifdef __APPLE__
     if (ioctl(fd, IOSSIOSPEED, &baud) < 0) {
       perror("IOSSIOSPEED");
     }
-  }
+#elif defined(__linux__)
+    struct termios2 t2;
+    if (ioctl(fd, TCGETS2, &t2) < 0) {
+      perror("TCGETS2");
+    } else {
+      t2.c_cflag &= ~CBAUD;
+      t2.c_cflag |= BOTHER;
+      t2.c_ispeed = baud;
+      t2.c_ospeed = baud;
+      if (ioctl(fd, TCSETS2, &t2) < 0) {
+        perror("TCSETS2");
+      }
+    }
 #endif
+  }
 
   return fd;
 }

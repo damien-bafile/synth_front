@@ -1,10 +1,6 @@
 #include "renderer.h"
 #include <cstdio>
 
-#ifndef GL_SILENCE_DEPRECATION
-#define GL_SILENCE_DEPRECATION
-#endif
-
 #if defined(__APPLE__)
 #include <OpenGL/gl3.h>
 #else

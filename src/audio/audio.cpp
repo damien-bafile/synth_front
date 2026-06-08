@@ -7,6 +7,16 @@
 static SDL_AudioStream *g_capture = nullptr;
 static SDL_AudioStream *g_playback = nullptr;
 
+static const char *sample_format_name(SDL_AudioFormat fmt) {
+    switch (fmt) {
+        case SDL_AUDIO_S8:    return "S8";
+        case SDL_AUDIO_S16LE: return "S16LE";
+        case SDL_AUDIO_S32LE: return "S32LE";
+        case SDL_AUDIO_F32LE: return "F32LE";
+        default:              return "?";
+    }
+}
+
 static SDL_AudioDeviceID find_teensy_audio_device(void) {
     int count = 0;
     SDL_AudioDeviceID *devices = SDL_GetAudioRecordingDevices(&count);
@@ -56,14 +66,32 @@ int audio_init(void) {
     SDL_AudioDeviceID teensy_dev = find_teensy_audio_device();
     if (!teensy_dev) return -1;
 
+    SDL_AudioSpec teensy_spec;
+    SDL_zero(teensy_spec);
+    if (!SDL_GetAudioDeviceFormat(teensy_dev, &teensy_spec, nullptr)) {
+        fprintf(stderr, "Failed to get Teensy audio format: %s\n", SDL_GetError());
+        return -1;
+    }
+
+    fprintf(stderr, "Teensy audio format: %d Hz, %d ch, %s\n",
+            (int)teensy_spec.freq, (int)teensy_spec.channels,
+            sample_format_name(teensy_spec.format));
+
     g_playback = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
-                                            nullptr, nullptr, nullptr);
+                                            &teensy_spec, nullptr, nullptr);
     if (!g_playback) {
         fprintf(stderr, "Failed to open playback: %s\n", SDL_GetError());
         return -1;
     }
 
-    g_capture = SDL_OpenAudioDeviceStream(teensy_dev, nullptr,
+    SDL_AudioSpec pb_spec;
+    SDL_zero(pb_spec);
+    SDL_GetAudioStreamFormat(g_playback, &pb_spec, nullptr);
+    fprintf(stderr, "Playback stream format:  %d Hz, %d ch, %s\n",
+            (int)pb_spec.freq, (int)pb_spec.channels,
+            sample_format_name(pb_spec.format));
+
+    g_capture = SDL_OpenAudioDeviceStream(teensy_dev, &teensy_spec,
                                            capture_callback, g_playback);
     if (!g_capture) {
         fprintf(stderr, "Failed to open capture: %s\n", SDL_GetError());

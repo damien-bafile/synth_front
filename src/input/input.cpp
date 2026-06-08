@@ -16,6 +16,9 @@ InputResult input_map_key(SDL_Keycode key, bool shift) {
         case SDLK_LEFT:     return make_key(0x03);
         case SDLK_RIGHT:    return make_key(0x04);
         case SDLK_RETURN:   return make_key(0x10);
+        case SDLK_COMMA:    return make_key(0x07);
+        case SDLK_PERIOD:   return make_key(0x08);
+        case SDLK_F1:       return make_key(0x60);
 
         case SDLK_F6:
         case SDLK_MINUS:    return make_transport(0xFA);

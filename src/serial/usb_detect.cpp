@@ -1,9 +1,77 @@
 #include "usb_detect.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#include <setupapi.h>
+#include <cstdio>
+#include <cstring>
+#include <string>
+#include <vector>
+
+std::vector<std::string> find_serial_ports() {
+    std::vector<std::string> ports;
+
+    HKEY key;
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DEVICEMAP\\SERIALCOMM",
+            0, KEY_READ, &key) != ERROR_SUCCESS) return ports;
+
+    char name[256];
+    char value[64];
+    DWORD name_size, value_size, type;
+
+    for (DWORD i = 0; ; i++) {
+        name_size = sizeof(name);
+        value_size = sizeof(value);
+        if (RegEnumValueA(key, i, name, &name_size, nullptr, &type,
+                reinterpret_cast<LPBYTE>(value), &value_size) != ERROR_SUCCESS) break;
+        if (type == REG_SZ) ports.push_back(value);
+    }
+
+    RegCloseKey(key);
+    return ports;
+}
+
+std::string find_teensy_port() {
+    HDEVINFO dev_info = SetupDiGetClassDevsA(nullptr, nullptr, nullptr,
+        DIGCF_PRESENT | DIGCF_ALLCLASSES);
+    if (dev_info == INVALID_HANDLE_VALUE) return "";
+
+    SP_DEVINFO_DATA dev_data = {};
+    dev_data.cbSize = sizeof(dev_data);
+
+    for (DWORD i = 0; SetupDiEnumDeviceInfo(dev_info, i, &dev_data); i++) {
+        char hw_id[256] = {};
+        if (!SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_data,
+                SPDRP_HARDWAREID, nullptr, reinterpret_cast<PBYTE>(hw_id), sizeof(hw_id), nullptr))
+            continue;
+
+        if (!strstr(hw_id, "VID_16C0"))
+            continue;
+
+        char friendly[256] = {};
+        if (!SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_data,
+                SPDRP_FRIENDLYNAME, nullptr, reinterpret_cast<PBYTE>(friendly), sizeof(friendly), nullptr))
+            continue;
+
+        const char* open_paren = strrchr(friendly, '(');
+        const char* close_paren = open_paren ? strchr(open_paren, ')') : nullptr;
+        if (!open_paren || !close_paren) continue;
+
+        std::string port(open_paren + 1, close_paren - open_paren - 1);
+        SetupDiDestroyDeviceInfoList(dev_info);
+        return port;
+    }
+
+    SetupDiDestroyDeviceInfoList(dev_info);
+    return "";
+}
+
+#else
+
 #include <dirent.h>
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
-#include <string>
 
 #ifdef __linux__
 #include <limits.h>
@@ -85,3 +153,5 @@ std::string find_teensy_port() {
     }
     return "";
 }
+
+#endif

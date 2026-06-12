@@ -6,7 +6,6 @@
 #include <mutex>
 
 #include "serial/serial_port.h"
-#include "serial/tcp_socket.h"
 #include "serial/usb_detect.h"
 #include "protocol/protocol.h"
 #include "protocol/framebuffer.h"
@@ -20,7 +19,6 @@ static constexpr int FB_RGB888_SIZE = 320 * 480 * 3;
 
 static std::atomic<bool> g_running{true};
 static int g_conn_fd = -1;
-static bool g_is_tcp = false;
 static std::mutex g_serial_mutex;
 
 struct MidiEvent {
@@ -36,11 +34,8 @@ static std::atomic<int> g_midi_head{0};
 static int g_midi_tail = 0;
 
 // Close a serial or TCP connection by its file descriptor.
-static void conn_close(int fd, bool is_tcp) {
-  if (fd >= 0) {
-    if (is_tcp) tcp_close(fd);
-    else serial_close(fd);
-  }
+static void conn_close(int fd) {
+  if (fd >= 0) serial_close(fd);
 }
 
 // Send a key-down or key-up event to the connected device.
@@ -156,23 +151,12 @@ static void serial_thread_func() {
 
 // Entry point: open serial/TCP, set up SDL/OpenGL window, run render loop with key handling.
 int main(int argc, char* argv[]) {
-  bool use_tcp = false;
   std::string port;
-  std::string host = "127.0.0.1";
-  int tcp_port = 9877;
   std::string midi_source;
 
   for (int i = 1; i < argc; i++) {
     if (std::strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
       port = argv[++i];
-    } else if (std::strcmp(argv[i], "--host") == 0 && i + 1 < argc) {
-      use_tcp = true;
-      std::string addr = argv[++i];
-      auto colon = addr.find(':');
-      if (colon != std::string::npos) {
-        host = addr.substr(0, colon);
-        tcp_port = std::stoi(addr.substr(colon + 1));
-      }
     } else if (std::strcmp(argv[i], "--list-midi") == 0) {
       auto sources = midi_input_list_sources();
       fprintf(stderr, "MIDI input sources:\n");
@@ -185,32 +169,22 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  if (use_tcp) {
-    fprintf(stderr, "Connecting to %s:%d...\n", host.c_str(), tcp_port);
-    g_conn_fd = tcp_connect(host.c_str(), tcp_port);
-    if (g_conn_fd < 0) {
-      fprintf(stderr, "Failed to connect.\n");
-      return 1;
+  if (port.empty()) {
+    port = find_teensy_port();
+  }
+  if (port.empty()) {
+    fprintf(stderr, "No Teensy found. Use --port <path>.\n");
+    fprintf(stderr, "Available serial ports:\n");
+    for (const auto& p : find_serial_ports()) {
+      fprintf(stderr, "  %s\n", p.c_str());
     }
-    g_is_tcp = true;
-  } else {
-    if (port.empty()) {
-      port = find_teensy_port();
-    }
-    if (port.empty()) {
-      fprintf(stderr, "No Teensy found. Use --port <path> or --host <addr:port>.\n");
-      fprintf(stderr, "Available serial ports:\n");
-      for (const auto& p : find_serial_ports()) {
-        fprintf(stderr, "  %s\n", p.c_str());
-      }
-      return 1;
-    }
-    fprintf(stderr, "Connecting to Teensy on %s...\n", port.c_str());
-    g_conn_fd = serial_open(port.c_str(), 2000000);
-    if (g_conn_fd < 0) {
-      fprintf(stderr, "Failed to open serial port.\n");
-      return 1;
-    }
+    return 1;
+  }
+  fprintf(stderr, "Connecting to Teensy on %s...\n", port.c_str());
+  g_conn_fd = serial_open(port.c_str(), 2000000);
+  if (g_conn_fd < 0) {
+    fprintf(stderr, "Failed to open serial port.\n");
+    return 1;
   }
 
   MidiInput midi_in{};
@@ -252,7 +226,7 @@ int main(int argc, char* argv[]) {
   if (!window) {
     fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
     midi_input_close(&midi_in);
-    conn_close(g_conn_fd, g_is_tcp);
+    conn_close(g_conn_fd);
     SDL_Quit();
     return 1;
   }
@@ -260,7 +234,7 @@ int main(int argc, char* argv[]) {
   Renderer renderer;
   if (!renderer_init(&renderer, window)) {
     midi_input_close(&midi_in);
-    conn_close(g_conn_fd, g_is_tcp);
+    conn_close(g_conn_fd);
     SDL_DestroyWindow(window);
     SDL_Quit();
     return 1;
@@ -341,7 +315,7 @@ int main(int argc, char* argv[]) {
   serial_thread.join();
 
   midi_input_close(&midi_in);
-  conn_close(g_conn_fd, g_is_tcp);
+  conn_close(g_conn_fd);
 
   audio_shutdown();
 

@@ -8,6 +8,7 @@ enum class PacketType : uint8_t {
   KEY_UP   = 0x02,
   PING     = 0x04,
   ENCODER  = 0x05,
+  TOUCH    = 0x08,
 
   FRAME = 0x81,
   DEBUG = 0x82,
@@ -46,3 +47,6 @@ void packet_send_encoder(int fd, uint8_t index, int16_t delta);
 
 // Send a transport packet (START/CONTINUE/STOP) with zero-length payload.
 void packet_send_transport(int fd, PacketType type);
+
+// Send a touch packet: [x_hi, x_lo, y_hi, y_lo, state] where state=1 press, 0 release.
+void packet_send_touch(int fd, uint16_t x, uint16_t y, uint8_t state);

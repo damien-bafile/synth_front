@@ -56,3 +56,12 @@ void packet_send_encoder(int fd, uint8_t index, int16_t delta) {
 void packet_send_transport(int fd, PacketType type) {
   packet_send(fd, type, nullptr, 0);
 }
+
+void packet_send_touch(int fd, uint16_t x, uint16_t y, uint8_t state) {
+  uint8_t payload[5] = {
+    (uint8_t)((x >> 8) & 0xFF), (uint8_t)(x & 0xFF),
+    (uint8_t)((y >> 8) & 0xFF), (uint8_t)(y & 0xFF),
+    state
+  };
+  packet_send(fd, PacketType::TOUCH, payload, 5);
+}

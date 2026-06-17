@@ -73,6 +73,12 @@ static void send_encoder(int fd, uint8_t index, int16_t delta) {
   packet_send_encoder(fd, index, delta);
 }
 
+// Send a touch event to the connected device.
+static void send_touch(int fd, uint16_t x, uint16_t y, bool pressed) {
+  std::lock_guard<std::mutex> lock(g_serial_mutex);
+  packet_send_touch(fd, x, y, pressed ? 1 : 0);
+}
+
 // Convert an RGB565 pixel buffer to RGB888 for OpenGL texture upload.
 static void convert_rgb565_to_rgb888(const uint8_t* src, uint8_t* dst, int pixels) {
   const uint16_t* s = reinterpret_cast<const uint16_t*>(src);
@@ -276,6 +282,7 @@ int main(int argc, char* argv[]) {
   SDL_Event event;
   uint8_t fb_rgb565[FB_RGB565_SIZE];
   int fb_w, fb_h;
+  bool mouse_down = false;
 
   while (running) {
     while (SDL_PollEvent(&event)) {
@@ -283,6 +290,28 @@ int main(int argc, char* argv[]) {
         case SDL_EVENT_QUIT:
           running = false;
           break;
+        case SDL_EVENT_MOUSE_BUTTON_DOWN:
+        case SDL_EVENT_MOUSE_MOTION:
+        case SDL_EVENT_MOUSE_BUTTON_UP: {
+          if (event.type == SDL_EVENT_MOUSE_MOTION) break; // motion not needed
+          if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+            mouse_down = true;
+          } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+            mouse_down = false;
+          }
+          float mx = (event.type == SDL_EVENT_MOUSE_MOTION)
+                         ? event.motion.x : event.button.x;
+          float my = (event.type == SDL_EVENT_MOUSE_MOTION)
+                         ? event.motion.y : event.button.y;
+          int ww_logical, wh_logical;
+          SDL_GetWindowSize(window, &ww_logical, &wh_logical);
+          uint16_t tx = (uint16_t)(mx / ww_logical * 320.0f);
+          uint16_t ty = (uint16_t)(my / wh_logical * 480.0f);
+          if (tx >= 320) tx = 319;
+          if (ty >= 480) ty = 479;
+          send_touch(g_conn_fd, tx, ty, mouse_down);
+          break;
+        }
         case SDL_EVENT_KEY_DOWN:
         case SDL_EVENT_KEY_UP: {
           bool down = (event.type == SDL_EVENT_KEY_DOWN);

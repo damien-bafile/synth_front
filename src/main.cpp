@@ -293,7 +293,7 @@ int main(int argc, char* argv[]) {
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         case SDL_EVENT_MOUSE_MOTION:
         case SDL_EVENT_MOUSE_BUTTON_UP: {
-          if (event.type == SDL_EVENT_MOUSE_MOTION) break; // motion not needed
+          if (event.type == SDL_EVENT_MOUSE_MOTION && !mouse_down) break;
           if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
             mouse_down = true;
           } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {

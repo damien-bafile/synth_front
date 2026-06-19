@@ -20,6 +20,17 @@ InputResult input_map_key(SDL_Keycode key, bool shift) {
         case SDLK_PERIOD:   return make_key(0x08);
         case SDLK_F1:       return make_key(0x60);
 
+        case SDLK_1: return make_key(0x50);
+        case SDLK_2: return make_key(0x51);
+        case SDLK_3: return make_key(0x52);
+        case SDLK_4: return make_key(0x53);
+        case SDLK_5: return make_key(0x54);
+        case SDLK_6: return make_key(0x55);
+        case SDLK_7: return make_key(0x56);
+        case SDLK_8: return make_key(0x57);
+        case SDLK_9: return make_key(0x58);
+        case SDLK_0: return make_key(0x59);
+
         case SDLK_F6:
         case SDLK_MINUS:    return make_transport(0xFA);
         case SDLK_F7:
@@ -36,14 +47,14 @@ InputResult input_map_key(SDL_Keycode key, bool shift) {
         case SDLK_U: return make_note(71);
         case SDLK_I: return make_note(72);
 
-        case SDLK_1: return make_encoder(0, shift ? -1 : 1);
-        case SDLK_2: return make_encoder(1, shift ? -1 : 1);
-        case SDLK_3: return make_encoder(2, shift ? -1 : 1);
-        case SDLK_4: return make_encoder(3, shift ? -1 : 1);
-        case SDLK_5: return make_encoder(4, shift ? -1 : 1);
-        case SDLK_6: return make_encoder(5, shift ? -1 : 1);
-        case SDLK_7: return make_encoder(6, shift ? -1 : 1);
-        case SDLK_8: return make_encoder(7, shift ? -1 : 1);
+        case SDLK_A: return make_encoder(0, shift ? -1 : 1);
+        case SDLK_S: return make_encoder(1, shift ? -1 : 1);
+        case SDLK_D: return make_encoder(2, shift ? -1 : 1);
+        case SDLK_F: return make_encoder(3, shift ? -1 : 1);
+        case SDLK_G: return make_encoder(4, shift ? -1 : 1);
+        case SDLK_H: return make_encoder(5, shift ? -1 : 1);
+        case SDLK_J: return make_encoder(6, shift ? -1 : 1);
+        case SDLK_K: return make_encoder(7, shift ? -1 : 1);
 
         default: return empty();
     }

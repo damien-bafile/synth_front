@@ -153,8 +153,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
     }
 done_searching:
 
-    unsigned int port_type = SND_SEQ_PORT_TYPE_APPLICATION;
-    snd_seq_port_info_get_type(pinfo, const_cast<unsigned int*>(&port_type));
+    unsigned int port_type = snd_seq_port_info_get_type(pinfo);
     (void)port_type;
 
     if (found_client >= 0 && found_port >= 0) {

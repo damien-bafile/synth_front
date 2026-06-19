@@ -35,8 +35,11 @@ static bool is_teensy_sysfs(const std::string& dev_name) {
         if (fgets(vendor, sizeof(vendor), vf) && fgets(product, sizeof(product), pf)) {
             vendor[strcspn(vendor, "\n")] = 0;
             product[strcspn(product, "\n")] = 0;
-            if (strcmp(vendor, "16c0") == 0 && strcmp(product, "0483") == 0)
-                found = true;
+            if (strcmp(vendor, "16c0") == 0) {
+                unsigned long pid = strtoul(product, nullptr, 16);
+                if (pid == 0x0478 || (pid >= 0x0482 && pid <= 0x048f))
+                    found = true;
+            }
         }
 
         fclose(vf);

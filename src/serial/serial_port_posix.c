@@ -10,7 +10,16 @@
 #include <IOKit/serial/ioss.h>
 #elif defined(__linux__)
 #include <sys/ioctl.h>
-#include <asm/termbits.h>
+struct termios2 {
+    tcflag_t c_iflag;
+    tcflag_t c_oflag;
+    tcflag_t c_cflag;
+    tcflag_t c_lflag;
+    cc_t c_line;
+    cc_t c_cc[19];
+    speed_t c_ispeed;
+    speed_t c_ospeed;
+};
 #endif
 
 // Convert a numeric baud rate to a termios speed_t constant.

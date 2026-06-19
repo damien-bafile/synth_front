@@ -1,6 +1,7 @@
 #include "renderer.h"
 #include <cstdio>
 
+#define GL_GLEXT_PROTOTYPES 1
 #if defined(__APPLE__)
 #include <OpenGL/gl3.h>
 #else

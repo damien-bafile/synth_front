@@ -4,7 +4,10 @@
 #define GL_GLEXT_PROTOTYPES 1
 #if defined(__APPLE__)
 #include <OpenGL/gl3.h>
+#elif defined(_WIN32)
+#include <GL/glew.h>
 #else
+#define GL_GLEXT_PROTOTYPES 1
 #include <GL/glcorearb.h>
 #endif
 
@@ -56,6 +59,14 @@ bool renderer_init(Renderer* r, SDL_Window* window) {
   }
   SDL_GL_MakeCurrent(window, r->gl_ctx);
   SDL_GL_SetSwapInterval(1);
+
+#ifdef _WIN32
+  glewExperimental = GL_TRUE;
+  if (glewInit() != GLEW_OK) {
+    fprintf(stderr, "Failed to initialize GLEW\n");
+    return false;
+  }
+#endif
 
   unsigned int vs = compile_shader(GL_VERTEX_SHADER, vertex_shader_src);
   unsigned int fs = compile_shader(GL_FRAGMENT_SHADER, fragment_shader_src);

@@ -7,6 +7,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/deps")
 
+# MSYS2/MinGW reports as "MSYS" but we want WIN32 behavior
+if(CMAKE_SYSTEM_NAME STREQUAL "MSYS")
+  set(CMAKE_SYSTEM_NAME Windows CACHE STRING "" FORCE)
+  set(WIN32 TRUE CACHE BOOL "" FORCE)
+  set(UNIX FALSE CACHE BOOL "" FORCE)
+endif()
+
 include(FetchContent)
 
 FetchContent_Declare(
@@ -18,14 +25,32 @@ FetchContent_Declare(
 set(SDL_DISABLE_INSTALL ON CACHE BOOL "" FORCE)
 set(SDL_SHARED OFF CACHE BOOL "" FORCE)
 set(SDL_STATIC ON CACHE BOOL "" FORCE)
+set(SDL_DIRECTX OFF CACHE BOOL "" FORCE)
+set(SDL_PRECOMPILED_HEADERS OFF CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(SDL3)
 
+if(WIN32)
+  set(ONLY_LIBS ON CACHE BOOL "" FORCE)
+  set(glew-cmake_BUILD_SHARED OFF CACHE BOOL "" FORCE)
+  FetchContent_Declare(
+    glew
+    GIT_REPOSITORY https://github.com/Perlmint/glew-cmake.git
+    GIT_TAG glew-cmake-2.3.1
+    GIT_SHALLOW TRUE
+  )
+  FetchContent_MakeAvailable(glew)
+endif()
+
 file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c")
-list(FILTER SOURCES EXCLUDE REGEX "midi_input_(coremidi|alsa)\\.cpp")
+list(FILTER SOURCES EXCLUDE REGEX "midi_input_(coremidi|alsa|win32)\\.cpp")
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src")
-target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wextra -Wpedantic)
+if(MSVC)
+  target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
+else()
+  target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wextra -Wpedantic)
+endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3)
 
 if(APPLE)
@@ -45,4 +70,9 @@ elseif(UNIX)
   target_compile_definitions(${PROJECT_NAME} PRIVATE _GNU_SOURCE)
   target_link_libraries(${PROJECT_NAME} PRIVATE
     OpenGL::GL ${ALSA_LIBRARY})
+elseif(WIN32)
+  target_sources(${PROJECT_NAME} PRIVATE
+    "${CMAKE_SOURCE_DIR}/src/midi/midi_input_win32.cpp")
+  target_link_libraries(${PROJECT_NAME} PRIVATE
+    winmm opengl32 setupapi libglew_static)
 endif()

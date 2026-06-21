@@ -1,4 +1,9 @@
 #include "serial_port.h"
+
+#ifdef _WIN32
+#include <windows.h>
+#include <stdio.h>
+#else
 #include <fcntl.h>
 #include <unistd.h>
 #include <termios.h>
@@ -21,8 +26,81 @@ struct termios2 {
     speed_t c_ospeed;
 };
 #endif
+#endif
 
-// Convert a numeric baud rate to a termios speed_t constant.
+#ifdef _WIN32
+
+int serial_open(const char* device, int baud) {
+    char path[64];
+    snprintf(path, sizeof(path), "\\\\.\\%s", device);
+
+    HANDLE h = CreateFileA(path, GENERIC_READ | GENERIC_WRITE,
+        0, NULL, OPEN_EXISTING, 0, NULL);
+    if (h == INVALID_HANDLE_VALUE) {
+        fprintf(stderr, "serial_open(%s): error %lu\n", device, GetLastError());
+        return -1;
+    }
+
+    DCB dcb = {0};
+    dcb.DCBlength = sizeof(dcb);
+    if (!GetCommState(h, &dcb)) {
+        fprintf(stderr, "GetCommState: error %lu\n", GetLastError());
+        CloseHandle(h);
+        return -1;
+    }
+
+    dcb.BaudRate = baud;
+    dcb.ByteSize = 8;
+    dcb.Parity = NOPARITY;
+    dcb.StopBits = ONESTOPBIT;
+    dcb.fBinary = TRUE;
+    dcb.fDtrControl = DTR_CONTROL_DISABLE;
+    dcb.fRtsControl = RTS_CONTROL_DISABLE;
+    dcb.fOutxCtsFlow = FALSE;
+    dcb.fOutxDsrFlow = FALSE;
+    dcb.fDsrSensitivity = FALSE;
+    dcb.fOutX = FALSE;
+    dcb.fInX = FALSE;
+    dcb.fNull = FALSE;
+    dcb.fAbortOnError = FALSE;
+
+    if (!SetCommState(h, &dcb)) {
+        fprintf(stderr, "SetCommState: error %lu\n", GetLastError());
+        CloseHandle(h);
+        return -1;
+    }
+
+    COMMTIMEOUTS timeouts = {0};
+    timeouts.ReadIntervalTimeout = 10;
+    timeouts.ReadTotalTimeoutMultiplier = 0;
+    timeouts.ReadTotalTimeoutConstant = 100;
+    timeouts.WriteTotalTimeoutMultiplier = 0;
+    timeouts.WriteTotalTimeoutConstant = 0;
+    SetCommTimeouts(h, &timeouts);
+
+    return (int)(intptr_t)h;
+}
+
+void serial_close(int fd) {
+    if (fd >= 0) CloseHandle((HANDLE)(intptr_t)fd);
+}
+
+int serial_read(int fd, uint8_t* buf, int len) {
+    DWORD n = 0;
+    if (!ReadFile((HANDLE)(intptr_t)fd, buf, len, &n, NULL))
+        return -1;
+    return (int)n;
+}
+
+int serial_write(int fd, const uint8_t* buf, int len) {
+    DWORD n = 0;
+    if (!WriteFile((HANDLE)(intptr_t)fd, buf, len, &n, NULL))
+        return -1;
+    return (int)n;
+}
+
+#else
+
 static speed_t baud_to_speed(int baud) {
   switch (baud) {
     case 0:       return B0;
@@ -48,7 +126,6 @@ static speed_t baud_to_speed(int baud) {
   }
 }
 
-// Open and configure a serial device (8N1, raw mode) at the given baud rate.
 int serial_open(const char* device, int baud) {
   int fd = open(device, O_RDWR | O_NOCTTY);
   if (fd < 0) {
@@ -108,19 +185,18 @@ int serial_open(const char* device, int baud) {
   return fd;
 }
 
-// Close the serial port file descriptor.
 void serial_close(int fd) {
   if (fd >= 0) close(fd);
 }
 
-// Read from serial port; returns 0 on EAGAIN instead of -1.
 int serial_read(int fd, uint8_t* buf, int len) {
   int n = read(fd, buf, len);
   if (n < 0 && errno == EAGAIN) return 0;
   return n;
 }
 
-// Write bytes to the serial port; returns result of write().
 int serial_write(int fd, const uint8_t* buf, int len) {
   return write(fd, buf, len);
 }
+
+#endif

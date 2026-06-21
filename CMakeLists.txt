@@ -41,11 +41,24 @@ if(WIN32)
   FetchContent_MakeAvailable(glew)
 endif()
 
-file(GLOB_RECURSE SOURCES "${CMAKE_SOURCE_DIR}/src/*.cpp" "${CMAKE_SOURCE_DIR}/src/*.c")
-list(FILTER SOURCES EXCLUDE REGEX "midi_input_(coremidi|alsa|win32)\\.cpp")
+set(SOURCES
+  "${CMAKE_SOURCE_DIR}/src/main.cpp"
+  "${CMAKE_SOURCE_DIR}/src/audio/audio.cpp"
+  "${CMAKE_SOURCE_DIR}/src/input/input.cpp"
+  "${CMAKE_SOURCE_DIR}/src/protocol/framebuffer.cpp"
+  "${CMAKE_SOURCE_DIR}/src/protocol/packet.cpp"
+  "${CMAKE_SOURCE_DIR}/src/render/renderer.cpp"
+  "${CMAKE_SOURCE_DIR}/src/serial/serial_port.c"
+  "${CMAKE_SOURCE_DIR}/src/serial/usb_detect.cpp"
+)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src")
+
+if(CLANG_TIDY)
+  set(CMAKE_CXX_CLANG_TIDY "clang-tidy")
+endif()
+
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
 else()
@@ -76,3 +89,29 @@ elseif(WIN32)
   target_link_libraries(${PROJECT_NAME} PRIVATE
     winmm opengl32 setupapi libglew_static)
 endif()
+
+# -- Tests -------------------------------------------------------------------
+FetchContent_Declare(
+  GTest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG v1.15.2
+  GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(GTest)
+
+enable_testing()
+include(GoogleTest)
+
+set(TEST_SOURCES
+  "${CMAKE_SOURCE_DIR}/tests/test_protocol.cpp"
+  "${CMAKE_SOURCE_DIR}/tests/test_framebuffer.cpp"
+)
+
+add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES}
+  "${CMAKE_SOURCE_DIR}/src/protocol/packet.cpp"
+  "${CMAKE_SOURCE_DIR}/src/protocol/framebuffer.cpp"
+  "${CMAKE_SOURCE_DIR}/src/serial/serial_port.c"
+)
+target_include_directories(${PROJECT_NAME}_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(${PROJECT_NAME}_tests PRIVATE GTest::gtest_main)
+gtest_discover_tests(${PROJECT_NAME}_tests)

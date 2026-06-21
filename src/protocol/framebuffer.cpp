@@ -2,9 +2,6 @@
 #include <cstring>
 #include <atomic>
 
-static constexpr int MAX_FB_PIXELS = 320 * 480;
-static constexpr int FB_RGB565_SIZE = MAX_FB_PIXELS * 2;
-
 static uint8_t g_fb[2][FB_RGB565_SIZE];
 static int g_cur = 0;
 static int g_width = 0;
@@ -14,7 +11,8 @@ static std::atomic<int> g_done{-1};
 // Reset framebuffer state for new dimensions; rejects sizes above the static limit.
 bool framebuffer_init(int width, int height) {
   int pixels = width * height;
-  if (pixels > MAX_FB_PIXELS) return false;
+  if (pixels > FB_MAX_PIXELS)
+    return false;
   if (width != g_width || height != g_height) {
     g_width = width;
     g_height = height;
@@ -35,7 +33,8 @@ void framebuffer_write_tile(int tx, int ty, int tw, int th, const uint8_t* rgb56
   }
 }
 
-// Swap buffers: the current frame becomes available for reading, and writing continues on the other.
+// Swap buffers: the current frame becomes available for reading, and writing continues on the
+// other.
 void framebuffer_finish_frame() {
   int done = g_cur;
   g_cur ^= 1;
@@ -45,7 +44,8 @@ void framebuffer_finish_frame() {
 // Copy the latest finished frame into out; returns false if no new frame is ready.
 bool framebuffer_get(uint8_t* out, int* out_width, int* out_height) {
   int idx = g_done.exchange(-1, std::memory_order_acquire);
-  if (idx < 0) return false;
+  if (idx < 0)
+    return false;
   std::memcpy(out, g_fb[idx], g_width * g_height * 2);
   *out_width = g_width;
   *out_height = g_height;

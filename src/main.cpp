@@ -14,11 +14,8 @@
 #include "midi/midi_input.h"
 #include "audio/audio.h"
 
-static constexpr int FB_RGB565_SIZE = 320 * 480 * 2;
-static constexpr int FB_RGB888_SIZE = 320 * 480 * 3;
-
 static std::atomic<bool> g_running{true};
-static int g_conn_fd = -1;
+static std::atomic<int> g_conn_fd{-1};
 static std::mutex g_serial_mutex;
 
 struct MidiEvent {
@@ -35,7 +32,8 @@ static int g_midi_tail = 0;
 
 // Close a serial or TCP connection by its file descriptor.
 static void conn_close(int fd) {
-  if (fd >= 0) serial_close(fd);
+  if (fd >= 0)
+    serial_close(fd);
 }
 
 // Send a key-down or key-up event to the connected device.
@@ -80,8 +78,8 @@ static void convert_rgb565_to_rgb888(const uint8_t* src, uint8_t* dst, int pixel
   for (int i = 0; i < pixels; i++) {
     uint16_t p = s[i];
     dst[i * 3 + 0] = ((p >> 11) & 0x1F) << 3;
-    dst[i * 3 + 1] = ((p >> 5)  & 0x3F) << 2;
-    dst[i * 3 + 2] = ( p        & 0x1F) << 3;
+    dst[i * 3 + 1] = ((p >> 5) & 0x3F) << 2;
+    dst[i * 3 + 2] = (p & 0x1F) << 3;
   }
 }
 
@@ -102,48 +100,48 @@ static void serial_thread_func() {
     while (consumed < buf_len) {
       Packet pkt;
       int parsed = packet_parse(buf + consumed, buf_len - consumed, &pkt);
-      if (parsed == 0) break;
+      if (parsed == 0)
+        break;
       if (parsed < 0) {
         consumed++;
         continue;
       }
 
       switch (pkt.type) {
-        case PacketType::FRAME_TILE: {
-          if (pkt.payload.size() >= 14) {
-            uint16_t total_w = (pkt.payload[0] << 8) | pkt.payload[1];
-            uint16_t total_h = (pkt.payload[2] << 8) | pkt.payload[3];
-            // uint8_t fmt = pkt.payload[4];
-            uint16_t tx = (pkt.payload[5] << 8) | pkt.payload[6];
-            uint16_t ty = (pkt.payload[7] << 8) | pkt.payload[8];
-            uint16_t tw = (pkt.payload[9] << 8)  | pkt.payload[10];
-            uint16_t th = (pkt.payload[11] << 8) | pkt.payload[12];
-            const uint8_t* pixels = pkt.payload.data() + 13;
-            framebuffer_init(total_w, total_h);
-            framebuffer_write_tile(tx, ty, tw, th, pixels);
-            if (tx + tw >= total_w && ty + th >= total_h) {
-              framebuffer_finish_frame();
-            }
+      case PacketType::FRAME_TILE: {
+        if (pkt.payload.size() >= 14) {
+          uint16_t total_w = (pkt.payload[0] << 8) | pkt.payload[1];
+          uint16_t total_h = (pkt.payload[2] << 8) | pkt.payload[3];
+          uint16_t tx = (pkt.payload[5] << 8) | pkt.payload[6];
+          uint16_t ty = (pkt.payload[7] << 8) | pkt.payload[8];
+          uint16_t tw = (pkt.payload[9] << 8) | pkt.payload[10];
+          uint16_t th = (pkt.payload[11] << 8) | pkt.payload[12];
+          const uint8_t* pixels = pkt.payload.data() + 13;
+          framebuffer_init(total_w, total_h);
+          framebuffer_write_tile(tx, ty, tw, th, pixels);
+          if (tx + tw >= total_w && ty + th >= total_h) {
+            framebuffer_finish_frame();
           }
-          break;
         }
-        case PacketType::FRAME:
-        case PacketType::DEBUG: {
-          if (!pkt.payload.empty()) {
-            int len = pkt.payload[0];
-            if (len <= (int)pkt.payload.size() - 1) {
-              fwrite(pkt.payload.data() + 1, 1, len, stdout);
-              fputc('\n', stdout);
-              fflush(stdout);
-            }
+        break;
+      }
+      case PacketType::FRAME:
+      case PacketType::DEBUG: {
+        if (!pkt.payload.empty()) {
+          int len = pkt.payload[0];
+          if (len <= (int)pkt.payload.size() - 1) {
+            fwrite(pkt.payload.data() + 1, 1, len, stdout);
+            fputc('\n', stdout);
+            fflush(stdout);
           }
-          break;
         }
-        case PacketType::READY:
-          fprintf(stderr, "Teensy connected and ready.\n");
-          break;
-        default:
-          break;
+        break;
+      }
+      case PacketType::READY:
+        fprintf(stderr, "Teensy connected and ready.\n");
+        break;
+      default:
+        break;
       }
       consumed += parsed;
     }
@@ -194,41 +192,41 @@ int main(int argc, char* argv[]) {
   }
 
   MidiInput midi_in{};
-  midi_input_open(&midi_in,
-      midi_source.empty() ? nullptr : midi_source.c_str(),
-      [](uint8_t status, uint8_t data1, uint8_t data2) {
-        uint8_t channel = status & 0x0F;
-        uint8_t msg = status & 0xF0;
-        PacketType type;
-        if (msg == 0x90 && data2 > 0) {
-          type = PacketType::MIDI_NOTE_ON;
-        } else if (msg == 0x80 || (msg == 0x90 && data2 == 0)) {
-          type = PacketType::MIDI_NOTE_OFF;
-        } else if (msg == 0xB0) {
-          type = PacketType::MIDI_CC;
-        } else if (msg == 0xE0) {
-          type = PacketType::MIDI_PITCH_BEND;
-        } else if (status == 0xFA) {
-          send_transport(g_conn_fd, PacketType::MIDI_START);
-          return;
-        } else if (status == 0xFB) {
-          send_transport(g_conn_fd, PacketType::MIDI_CONTINUE);
-          return;
-        } else if (status == 0xFC) {
-          send_transport(g_conn_fd, PacketType::MIDI_STOP);
-          return;
-        } else {
-          return;
-        }
-        int slot = g_midi_head.load(std::memory_order_relaxed);
-        g_midi_queue[slot % MIDI_QUEUE_SIZE] = {type, channel, data1, data2};
-        g_midi_head.store(slot + 1, std::memory_order_release);
-      });
+  midi_input_open(&midi_in, midi_source.empty() ? nullptr : midi_source.c_str(),
+                  [](uint8_t status, uint8_t data1, uint8_t data2) {
+                    uint8_t channel = status & 0x0F;
+                    uint8_t msg = status & 0xF0;
+                    PacketType type;
+                    if (msg == 0x90 && data2 > 0) {
+                      type = PacketType::MIDI_NOTE_ON;
+                    } else if (msg == 0x80 || (msg == 0x90 && data2 == 0)) {
+                      type = PacketType::MIDI_NOTE_OFF;
+                    } else if (msg == 0xB0) {
+                      type = PacketType::MIDI_CC;
+                    } else if (msg == 0xE0) {
+                      type = PacketType::MIDI_PITCH_BEND;
+                    } else if (status == 0xFA) {
+                      send_transport(g_conn_fd, PacketType::MIDI_START);
+                      return;
+                    } else if (status == 0xFB) {
+                      send_transport(g_conn_fd, PacketType::MIDI_CONTINUE);
+                      return;
+                    } else if (status == 0xFC) {
+                      send_transport(g_conn_fd, PacketType::MIDI_STOP);
+                      return;
+                    } else {
+                      return;
+                    }
+                    int slot = g_midi_head.load(std::memory_order_relaxed);
+                    g_midi_queue[slot % MIDI_QUEUE_SIZE] = {type, channel, data1, data2};
+                    g_midi_head.store(slot + 1, std::memory_order_release);
+                  });
 
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
 
-  SDL_Window* window = SDL_CreateWindow("synth front", 640, 960,
-    SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+  SDL_Window* window =
+      SDL_CreateWindow("synth front", 640, 960,
+                       SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
   if (!window) {
     fprintf(stderr, "Failed to create window: %s\n", SDL_GetError());
     midi_input_close(&midi_in);
@@ -261,61 +259,64 @@ int main(int argc, char* argv[]) {
   while (running) {
     while (SDL_PollEvent(&event)) {
       switch (event.type) {
-        case SDL_EVENT_QUIT:
-          running = false;
+      case SDL_EVENT_QUIT:
+        running = false;
+        break;
+      case SDL_EVENT_MOUSE_BUTTON_DOWN:
+      case SDL_EVENT_MOUSE_MOTION:
+      case SDL_EVENT_MOUSE_BUTTON_UP: {
+        if (event.type == SDL_EVENT_MOUSE_MOTION && !mouse_down)
           break;
-        case SDL_EVENT_MOUSE_BUTTON_DOWN:
-        case SDL_EVENT_MOUSE_MOTION:
-        case SDL_EVENT_MOUSE_BUTTON_UP: {
-          if (event.type == SDL_EVENT_MOUSE_MOTION && !mouse_down) break;
-          if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
-            mouse_down = true;
-          } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
-            mouse_down = false;
+        if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
+          mouse_down = true;
+        } else if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+          mouse_down = false;
+        }
+        float mx = (event.type == SDL_EVENT_MOUSE_MOTION) ? event.motion.x : event.button.x;
+        float my = (event.type == SDL_EVENT_MOUSE_MOTION) ? event.motion.y : event.button.y;
+        int ww_logical, wh_logical;
+        SDL_GetWindowSize(window, &ww_logical, &wh_logical);
+        uint16_t tx = (uint16_t)(mx / ww_logical * 320.0f);
+        uint16_t ty = (uint16_t)(my / wh_logical * 480.0f);
+        if (tx >= 320)
+          tx = 319;
+        if (ty >= 480)
+          ty = 479;
+        send_touch(g_conn_fd, tx, ty, mouse_down);
+        break;
+      }
+      case SDL_EVENT_KEY_DOWN:
+      case SDL_EVENT_KEY_UP: {
+        bool down = (event.type == SDL_EVENT_KEY_DOWN);
+        auto mod = SDL_GetModState();
+        auto result = input_map_key(event.key.key, (mod & SDL_KMOD_SHIFT) != 0);
+
+        bool is_encoder = (result.action == InputAction::ENCODER);
+        if (event.key.repeat && !is_encoder)
+          break;
+        if (!down && (is_encoder || result.action == InputAction::TRANSPORT))
+          break;
+
+        switch (result.action) {
+        case InputAction::KEY:
+          send_key(g_conn_fd, result.value, down);
+          break;
+        case InputAction::TRANSPORT:
+          send_transport(g_conn_fd, static_cast<PacketType>(result.value));
+          break;
+        case InputAction::NOTE:
+          send_midi_note(g_conn_fd, result.value, down);
+          break;
+        case InputAction::ENCODER:
+          if (result.encoder_delta != 0) {
+            send_encoder(g_conn_fd, result.value, result.encoder_delta);
           }
-          float mx = (event.type == SDL_EVENT_MOUSE_MOTION)
-                         ? event.motion.x : event.button.x;
-          float my = (event.type == SDL_EVENT_MOUSE_MOTION)
-                         ? event.motion.y : event.button.y;
-          int ww_logical, wh_logical;
-          SDL_GetWindowSize(window, &ww_logical, &wh_logical);
-          uint16_t tx = (uint16_t)(mx / ww_logical * 320.0f);
-          uint16_t ty = (uint16_t)(my / wh_logical * 480.0f);
-          if (tx >= 320) tx = 319;
-          if (ty >= 480) ty = 479;
-          send_touch(g_conn_fd, tx, ty, mouse_down);
           break;
         }
-        case SDL_EVENT_KEY_DOWN:
-        case SDL_EVENT_KEY_UP: {
-          bool down = (event.type == SDL_EVENT_KEY_DOWN);
-          auto mod = SDL_GetModState();
-          auto result = input_map_key(event.key.key, (mod & SDL_KMOD_SHIFT) != 0);
-
-          bool is_encoder = (result.action == InputAction::ENCODER);
-          if (event.key.repeat && !is_encoder) break;
-          if (!down && (is_encoder || result.action == InputAction::TRANSPORT)) break;
-
-          switch (result.action) {
-            case InputAction::KEY:
-              send_key(g_conn_fd, result.value, down);
-              break;
-            case InputAction::TRANSPORT:
-              send_transport(g_conn_fd, static_cast<PacketType>(result.value));
-              break;
-            case InputAction::NOTE:
-              send_midi_note(g_conn_fd, result.value, down);
-              break;
-            case InputAction::ENCODER:
-              if (result.encoder_delta != 0) {
-                send_encoder(g_conn_fd, result.value, result.encoder_delta);
-              }
-              break;
-          }
-          break;
-        }
-        default:
-          break;
+        break;
+      }
+      default:
+        break;
       }
     }
 

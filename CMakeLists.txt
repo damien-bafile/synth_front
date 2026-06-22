@@ -99,6 +99,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(GTest)
 
+if(APPLE)
+  target_compile_options(gtest PRIVATE -Wno-character-conversion)
+  target_compile_options(gtest_main PRIVATE -Wno-character-conversion)
+endif()
+
 enable_testing()
 include(GoogleTest)
 

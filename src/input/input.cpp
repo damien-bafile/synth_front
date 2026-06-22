@@ -30,9 +30,11 @@ InputResult input_map_key(SDL_Keycode key, bool shift) {
   case SDLK_RETURN:
     return make_key(0x10);
   case SDLK_COMMA:
-    return make_key(0x07);
+    if (shift) return make_key(0x08);  // < → V/H toggle
+    return make_key(0x68);             // , → encoder 7 push
   case SDLK_PERIOD:
-    return make_key(0x08);
+    if (shift) return make_key(0x08);  // > → V/H toggle
+    return empty();                    // . → nothing
   case SDLK_F1:
     return make_key(0x60);
 
@@ -58,7 +60,6 @@ InputResult input_map_key(SDL_Keycode key, bool shift) {
     return make_key(0x59);
 
   case SDLK_F6:
-  case SDLK_MINUS:
     return make_transport(0xFA);
   case SDLK_F7:
   case SDLK_ESCAPE:
@@ -100,6 +101,14 @@ InputResult input_map_key(SDL_Keycode key, bool shift) {
     return make_encoder(6, shift ? -1 : 1);
   case SDLK_K:
     return make_encoder(7, shift ? -1 : 1);
+
+  case SDLK_Z:     return make_key(0x61);
+  case SDLK_X:     return make_key(0x62);
+  case SDLK_C:     return make_key(0x63);
+  case SDLK_V:     return make_key(0x64);
+  case SDLK_B:     return make_key(0x65);
+  case SDLK_N:     return make_key(0x66);
+  case SDLK_M:     return make_key(0x67);
 
   default:
     return empty();

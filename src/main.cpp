@@ -289,6 +289,10 @@ int main(int argc, char* argv[]) {
       case SDL_EVENT_KEY_UP: {
         bool down = (event.type == SDL_EVENT_KEY_DOWN);
         auto mod = SDL_GetModState();
+        if ((mod & SDL_KMOD_CTRL) && (mod & SDL_KMOD_SHIFT) && event.key.key == SDLK_R) {
+          if (down) packet_send(g_conn_fd, PacketType::RESET, nullptr, 0);
+          break;
+        }
         auto result = input_map_key(event.key.key, (mod & SDL_KMOD_SHIFT) != 0);
 
         bool is_encoder = (result.action == InputAction::ENCODER);

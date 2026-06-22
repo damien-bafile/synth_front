@@ -23,6 +23,8 @@ enum class PacketType : uint8_t {
   MIDI_START    = 0xFA,
   MIDI_CONTINUE = 0xFB,
   MIDI_STOP     = 0xFC,
+
+  RESET         = 0x0C,
 };
 
 static constexpr uint8_t SYNC_BYTE = 0xAA;

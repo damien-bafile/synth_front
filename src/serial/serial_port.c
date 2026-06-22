@@ -15,6 +15,9 @@
 #include <IOKit/serial/ioss.h>
 #elif defined(__linux__)
 #include <sys/ioctl.h>
+#ifndef BOTHER
+#define BOTHER 0010000
+#endif
 struct termios2 {
   tcflag_t c_iflag;
   tcflag_t c_oflag;

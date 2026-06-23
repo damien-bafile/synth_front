@@ -10,6 +10,7 @@ struct Renderer {
   unsigned int texture;
   int tex_width;
   int tex_height;
+  int vp_x, vp_y, vp_w, vp_h;
 };
 
 // Create GL context, compile shaders, and set up the full-screen quad + texture.

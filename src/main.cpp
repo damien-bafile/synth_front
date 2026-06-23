@@ -72,6 +72,20 @@ static void send_touch(int fd, uint16_t x, uint16_t y, bool pressed) {
   packet_send_touch(fd, x, y, pressed ? 1 : 0);
 }
 
+// Map window-logical coordinates to framebuffer coordinates, correcting for letterbox viewport.
+static void window_to_fb(float mx, float my, const Renderer& r, uint16_t& tx, uint16_t& ty) {
+  float rx = (mx - r.vp_x) / r.vp_w;
+  float ry = (my - r.vp_y) / r.vp_h;
+  if (rx < 0.0f) rx = 0.0f;
+  if (rx > 1.0f) rx = 1.0f;
+  if (ry < 0.0f) ry = 0.0f;
+  if (ry > 1.0f) ry = 1.0f;
+  tx = (uint16_t)(rx * 320.0f);
+  ty = (uint16_t)(ry * 480.0f);
+  if (tx >= 320) tx = 319;
+  if (ty >= 480) ty = 479;
+}
+
 // Convert an RGB565 pixel buffer to RGB888 for OpenGL texture upload.
 static void convert_rgb565_to_rgb888(const uint8_t* src, uint8_t* dst, int pixels) {
   const uint16_t* s = reinterpret_cast<const uint16_t*>(src);
@@ -255,6 +269,7 @@ int main(int argc, char* argv[]) {
   uint8_t fb_rgb565[FB_RGB565_SIZE];
   int fb_w, fb_h;
   bool mouse_down = false;
+  bool finger_down = false;
 
   while (running) {
     while (SDL_PollEvent(&event)) {
@@ -274,15 +289,28 @@ int main(int argc, char* argv[]) {
         }
         float mx = (event.type == SDL_EVENT_MOUSE_MOTION) ? event.motion.x : event.button.x;
         float my = (event.type == SDL_EVENT_MOUSE_MOTION) ? event.motion.y : event.button.y;
-        int ww_logical, wh_logical;
-        SDL_GetWindowSize(window, &ww_logical, &wh_logical);
-        uint16_t tx = (uint16_t)(mx / ww_logical * 320.0f);
-        uint16_t ty = (uint16_t)(my / wh_logical * 480.0f);
-        if (tx >= 320)
-          tx = 319;
-        if (ty >= 480)
-          ty = 479;
+        uint16_t tx, ty;
+        window_to_fb(mx, my, renderer, tx, ty);
         send_touch(g_conn_fd, tx, ty, mouse_down);
+        break;
+      }
+      case SDL_EVENT_FINGER_DOWN:
+      case SDL_EVENT_FINGER_MOTION:
+      case SDL_EVENT_FINGER_UP: {
+        if (event.type == SDL_EVENT_FINGER_MOTION && !finger_down)
+          break;
+        if (event.type == SDL_EVENT_FINGER_DOWN) {
+          finger_down = true;
+        } else if (event.type == SDL_EVENT_FINGER_UP) {
+          finger_down = false;
+        }
+        int ww, wh;
+        SDL_GetWindowSize(window, &ww, &wh);
+        float mx = event.tfinger.x * ww;
+        float my = event.tfinger.y * wh;
+        uint16_t tx, ty;
+        window_to_fb(mx, my, renderer, tx, ty);
+        send_touch(g_conn_fd, tx, ty, finger_down);
         break;
       }
       case SDL_EVENT_KEY_DOWN:

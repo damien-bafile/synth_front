@@ -25,6 +25,10 @@ static void alsa_midi_thread_func(AlsaMidiBackend* b) {
         snd_seq_event_input(b->seq, &ev);
         continue;
       }
+      if (n == -EAGAIN) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        continue;
+      }
       break;
     }
 
@@ -169,7 +173,7 @@ done_searching:
     fprintf(stderr, "MIDI: no MIDI input sources found, running without MIDI input.\n");
   }
 
-  snd_seq_nonblock(b->seq, 0);
+  snd_seq_nonblock(b->seq, 1);
 
   b->running.store(true, std::memory_order_release);
   b->thread = std::thread(alsa_midi_thread_func, b);

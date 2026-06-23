@@ -157,19 +157,18 @@ void renderer_draw(Renderer* r, int window_width, int window_height) {
   float tex_aspect = r->tex_width > 0 ? (float)r->tex_width / (float)r->tex_height : 1.0f;
   float win_aspect = window_height > 0 ? (float)window_width / (float)window_height : 1.0f;
 
-  int vp_x, vp_y, vp_w, vp_h;
   if (tex_aspect > win_aspect) {
-    vp_w = window_width;
-    vp_h = (int)(window_width / tex_aspect);
-    vp_x = 0;
-    vp_y = (window_height - vp_h) / 2;
+    r->vp_w = window_width;
+    r->vp_h = (int)(window_width / tex_aspect);
+    r->vp_x = 0;
+    r->vp_y = (window_height - r->vp_h) / 2;
   } else {
-    vp_h = window_height;
-    vp_w = (int)(window_height * tex_aspect);
-    vp_y = 0;
-    vp_x = (window_width - vp_w) / 2;
+    r->vp_h = window_height;
+    r->vp_w = (int)(window_height * tex_aspect);
+    r->vp_y = 0;
+    r->vp_x = (window_width - r->vp_w) / 2;
   }
 
-  glViewport(vp_x, vp_y, vp_w, vp_h);
+  glViewport(r->vp_x, r->vp_y, r->vp_w, r->vp_h);
   glDrawArrays(GL_TRIANGLES, 0, 6);
 }

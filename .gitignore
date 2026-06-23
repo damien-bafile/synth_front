@@ -3,3 +3,5 @@ deps/
 .cache/
 graphify-out/
 .DS_Store
+.vscode/
+.clang-format

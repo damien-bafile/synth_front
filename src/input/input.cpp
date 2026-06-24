@@ -1,3 +1,10 @@
+/// @file input.cpp
+/// @brief Keyboard mapping from SDL keycodes to synth actions.
+///
+/// The QWERTY row (Q-I) maps to musical notes, A-K maps to eight encoders,
+/// Z-M maps to extra buttons, and function/arrow/number keys map to the
+/// front-panel controls.
+
 #include "input.h"
 
 static InputResult make_key(uint8_t kc) {
@@ -18,6 +25,8 @@ static InputResult empty() {
 }
 
 InputResult input_map_key(SDL_Keycode key, bool shift) {
+  // Arrow keys / Enter map to navigation/confirm keycodes.
+  // Q-I play notes, A-K act as encoders, Z-M are extra buttons.
   switch (key) {
   case SDLK_UP:
     return make_key(0x01);
@@ -75,6 +84,7 @@ InputResult input_map_key(SDL_Keycode key, bool shift) {
   case SDLK_0:
     return make_key(0x59);
 
+  // Escape and Tab double as MIDI transport stop/continue.
   case SDLK_ESCAPE:
     return make_transport(0xFC);
   case SDLK_TAB:
@@ -105,6 +115,7 @@ InputResult input_map_key(SDL_Keycode key, bool shift) {
   case SDLK_I:
     return make_note(72);
 
+  // Top letter row: encoders 0-7. Shift reverses the direction.
   case SDLK_A:
     return make_encoder(0, shift ? -1 : 1);
   case SDLK_S:

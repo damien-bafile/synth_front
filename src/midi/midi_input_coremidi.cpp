@@ -1,14 +1,23 @@
+/// @file midi_input_coremidi.cpp
+/// @brief CoreMIDI MIDI input backend for macOS.
+///
+/// Creates a CoreMIDI client and input port, connects to the first available
+/// (or user-named) source endpoint, and dispatches 3-byte MIDI messages
+/// through the user callback on CoreMIDI's internal callback thread.
+
 #include "midi_input.h"
 #include <CoreMIDI/CoreMIDI.h>
 #include <cstdio>
 #include <cstring>
 
 struct CoreMidiBackend {
-  MIDIClientRef client = 0;
-  MIDIEndpointRef endpoint = 0;
-  MIDIPortRef port = 0;
+  MIDIClientRef client = 0;    ///< CoreMIDI client reference.
+  MIDIEndpointRef endpoint = 0;///< Connected source endpoint (or 0).
+  MIDIPortRef port = 0;        ///< Input port receiving MIDI packets.
 };
 
+// CoreMIDI packet callback: forwards each 3-byte MIDI message to the user
+// callback. Invoked on CoreMIDI's internal thread.
 static void midi_read_callback(const MIDIPacketList* pktlist, void* readProcRefCon, void*) {
   MidiCallback* cb = reinterpret_cast<MidiCallback*>(readProcRefCon);
   const MIDIPacket* packet = &pktlist->packet[0];
@@ -29,6 +38,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
   m->cb = nullptr;
   m->running = false;
 
+  // Create a CoreMIDI client and input port for receiving packets.
   CFStringRef name = CFSTR("synth_front");
   MIDIClientRef client;
   OSStatus err = MIDIClientCreate(name, nullptr, nullptr, &client);
@@ -40,6 +50,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
   }
   b->client = client;
 
+  // Store the callback on the heap so its address remains stable in the C callback.
   auto* cb_ptr = new MidiCallback(std::move(cb));
   m->cb = cb_ptr;
 
@@ -56,6 +67,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
   }
   b->port = port;
 
+  // Select the first source, or the first source whose display name matches.
   ItemCount n = MIDIGetNumberOfSources();
   MIDIEndpointRef found = 0;
   for (ItemCount i = 0; i < n; i++) {
@@ -76,6 +88,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
     }
   }
 
+  // If no source is available we still report success; MIDI input is optional.
   if (!found) {
     fprintf(stderr, "MIDI: no matching source found, running without MIDI input.\n");
     MIDIPortDispose(port);
@@ -106,7 +119,7 @@ void midi_input_close(MidiInput* m) {
   if (!b)
     return;
 
-  if (b->port) {
+  // Disconnect and dispose in reverse order of creation.
     if (b->endpoint) {
       MIDIPortDisconnectSource(b->port, b->endpoint);
     }

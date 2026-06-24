@@ -1,3 +1,9 @@
+/// @file packet.cpp
+/// @brief Binary packet encode/decode implementation.
+///
+/// Packets use a simple framing format: sync byte, type, big-endian 32-bit
+/// payload length, payload, and a trailing XOR checksum over type+length+payload.
+
 #include "protocol.h"
 #include "../serial/serial_port.h"
 

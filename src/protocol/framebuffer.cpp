@@ -1,3 +1,11 @@
+/// @file framebuffer.cpp
+/// @brief Double-buffered RGB565 framebuffer implementation.
+///
+/// Two static buffers are ping-ponged between the serial producer thread
+/// (writing tiles and finishing frames) and the main consumer thread
+/// (reading completed frames). g_done uses an atomic exchange so the consumer
+/// safely claims the latest frame exactly once.
+
 #include "framebuffer.h"
 #include <cstring>
 #include <atomic>
@@ -39,6 +47,14 @@ void framebuffer_finish_frame() {
   int done = g_cur;
   g_cur ^= 1;
   g_done.store(done, std::memory_order_release);
+}
+
+// Clear both buffers to black and publish a frame.
+void framebuffer_clear() {
+  std::memset(g_fb[0], 0, FB_RGB565_SIZE);
+  std::memset(g_fb[1], 0, FB_RGB565_SIZE);
+  g_cur = 0;
+  g_done.store(0, std::memory_order_release);
 }
 
 // Copy the latest finished frame into out; returns false if no new frame is ready.

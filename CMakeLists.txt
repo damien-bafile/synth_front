@@ -41,6 +41,24 @@ if(WIN32)
   FetchContent_MakeAvailable(glew)
 endif()
 
+# Dear ImGui — immediate-mode UI library with SDL3 + OpenGL 3.3 backends.
+FetchContent_Declare(
+  imgui
+  GIT_REPOSITORY https://github.com/ocornut/imgui.git
+  GIT_TAG v1.91.8
+  GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(imgui)
+
+set(IMGUI_SOURCES
+  "${imgui_SOURCE_DIR}/imgui.cpp"
+  "${imgui_SOURCE_DIR}/imgui_draw.cpp"
+  "${imgui_SOURCE_DIR}/imgui_tables.cpp"
+  "${imgui_SOURCE_DIR}/imgui_widgets.cpp"
+  "${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp"
+  "${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp"
+)
+
 set(SOURCES
   "${CMAKE_SOURCE_DIR}/src/main.cpp"
   "${CMAKE_SOURCE_DIR}/src/audio/audio.cpp"
@@ -50,10 +68,13 @@ set(SOURCES
   "${CMAKE_SOURCE_DIR}/src/render/renderer.cpp"
   "${CMAKE_SOURCE_DIR}/src/serial/serial_port.c"
   "${CMAKE_SOURCE_DIR}/src/serial/usb_detect.cpp"
+  ${IMGUI_SOURCES}
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_SOURCE_DIR}/src")
+target_include_directories(${PROJECT_NAME} PRIVATE "${imgui_SOURCE_DIR}")
+target_include_directories(${PROJECT_NAME} PRIVATE "${imgui_SOURCE_DIR}/backends")
 
 if(CLANG_TIDY)
   set(CMAKE_CXX_CLANG_TIDY "clang-tidy")

@@ -1,3 +1,9 @@
+/// @file usb_detect.cpp
+/// @brief Platform-specific serial port enumeration and Teensy detection.
+///
+/// Windows uses the registry for port names and SetupAPI for USB hardware IDs.
+/// macOS and Linux scan /dev and match Teensy by its USB VID/PID.
+
 #include "usb_detect.h"
 
 #ifdef _WIN32
@@ -11,6 +17,7 @@
 std::vector<std::string> find_serial_ports() {
   std::vector<std::string> ports;
 
+  // The Windows device map lists COM-port mappings under this registry key.
   HKEY key;
   if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "HARDWARE\\DEVICEMAP\\SERIALCOMM", 0, KEY_READ, &key) !=
       ERROR_SUCCESS)
@@ -35,6 +42,7 @@ std::vector<std::string> find_serial_ports() {
 }
 
 std::string find_teensy_port() {
+  // Enumerate all present devices so we can inspect their hardware IDs.
   HDEVINFO dev_info =
       SetupDiGetClassDevsA(nullptr, nullptr, nullptr, DIGCF_PRESENT | DIGCF_ALLCLASSES);
   if (dev_info == INVALID_HANDLE_VALUE)
@@ -49,9 +57,11 @@ std::string find_teensy_port() {
                                            reinterpret_cast<PBYTE>(hw_id), sizeof(hw_id), nullptr))
       continue;
 
+    // PJRC / Teensy USB vendor ID is 0x16C0.
     if (!strstr(hw_id, "VID_16C0"))
       continue;
 
+    // The friendly name typically looks like "USB Serial Device (COMxx)".
     char friendly[256] = {};
     if (!SetupDiGetDeviceRegistryPropertyA(dev_info, &dev_data, SPDRP_FRIENDLYNAME, nullptr,
                                            reinterpret_cast<PBYTE>(friendly), sizeof(friendly),
@@ -84,6 +94,8 @@ std::string find_teensy_port() {
 #endif
 
 #ifdef __linux__
+// Walk up the sysfs tree from /sys/class/tty/<dev>/device looking for the
+// USB device's idVendor/idProduct files. Accepts Teensyduino serial VID/PID.
 static bool is_teensy_sysfs(const std::string& dev_name) {
   std::string base = "/sys/class/tty/" + dev_name + "/device";
   char real[PATH_MAX];
@@ -112,6 +124,7 @@ static bool is_teensy_sysfs(const std::string& dev_name) {
     if (fgets(vendor, sizeof(vendor), vf) && fgets(product, sizeof(product), pf)) {
       vendor[strcspn(vendor, "\n")] = 0;
       product[strcspn(product, "\n")] = 0;
+      // Teensy VID is 0x16C0. Accepted PIDs cover Teensyduino serial and HID.
       if (strcmp(vendor, "16c0") == 0) {
         unsigned long pid = strtoul(product, nullptr, 16);
         if (pid == 0x0478 || (pid >= 0x0482 && pid <= 0x048f))
@@ -137,10 +150,12 @@ std::vector<std::string> find_serial_ports() {
   while ((entry = readdir(dir))) {
     const char* name = entry->d_name;
 #ifdef __APPLE__
+    // macOS provides callout devices as "cu.*".
     if (strncmp(name, "cu.", 3) == 0) {
       ports.push_back(std::string("/dev/") + name);
     }
 #else
+    // Linux USB CDC-ACM and USB-to-serial adapters.
     if (strncmp(name, "ttyACM", 6) == 0 || strncmp(name, "ttyUSB", 6) == 0) {
       ports.push_back(std::string("/dev/") + name);
     }
@@ -154,6 +169,7 @@ std::string find_teensy_port() {
   auto ports = find_serial_ports();
   for (const auto& p : ports) {
 #ifdef __APPLE__
+    // Teensyduino on macOS exposes ports named "usbmodem*" or "tty.usbmodem*".
     if (p.find("usbmodem") != std::string::npos)
       return p;
     if (p.find("tty.usbmodem") != std::string::npos)

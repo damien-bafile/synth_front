@@ -1,3 +1,10 @@
+/// @file renderer.cpp
+/// @brief OpenGL 3.3 Core renderer implementation.
+///
+/// Renders the Teensy display as a full-screen textured quad. The shaders are
+/// embedded as string literals; the vertex layout is a simple interleaved
+/// position + texcoord buffer.
+
 #include "renderer.h"
 #include <cstdio>
 

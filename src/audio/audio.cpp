@@ -1,3 +1,10 @@
+/// @file audio.cpp
+/// @brief SDL3 audio passthrough implementation.
+///
+/// Opens the Teensy as a recording device, opens the default playback device,
+/// and copies captured audio chunks from the recording stream callback into the
+/// playback stream.
+
 #include "audio/audio.h"
 #include <SDL3/SDL.h>
 #include <cstdio>
@@ -7,6 +14,7 @@
 static SDL_AudioStream* g_capture = nullptr;
 static SDL_AudioStream* g_playback = nullptr;
 
+// Convert SDL audio format enum to a short human-readable name for logging.
 static const char* sample_format_name(SDL_AudioFormat fmt) {
   switch (fmt) {
   case SDL_AUDIO_S8:
@@ -28,6 +36,7 @@ static SDL_AudioDeviceID find_teensy_audio_device(void) {
   if (!devices)
     return 0;
 
+  // Prefer a recording device whose name contains "Teensy".
   SDL_AudioDeviceID found = 0;
   for (int i = 0; i < count; i++) {
     const char* name = SDL_GetAudioDeviceName(devices[i]);
@@ -50,6 +59,8 @@ static SDL_AudioDeviceID find_teensy_audio_device(void) {
   return found;
 }
 
+// SDL audio stream callback: copy captured audio from the Teensy recording
+// stream into the default playback stream. Runs on SDL's audio thread.
 static void SDLCALL capture_callback(void* userdata, SDL_AudioStream* stream, int additional_amount,
                                      int total_amount) {
   (void)total_amount;
@@ -86,6 +97,8 @@ int audio_init(void) {
   fprintf(stderr, "Teensy audio format: %d Hz, %d ch, %s\n", (int)teensy_spec.freq,
           (int)teensy_spec.channels, sample_format_name(teensy_spec.format));
 
+  // Open the default playback device with the same spec as the Teensy so SDL
+  // does not need to resample.
   g_playback =
       SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &teensy_spec, nullptr, nullptr);
   if (!g_playback) {
@@ -99,6 +112,7 @@ int audio_init(void) {
   fprintf(stderr, "Playback stream format:  %d Hz, %d ch, %s\n", (int)pb_spec.freq,
           (int)pb_spec.channels, sample_format_name(pb_spec.format));
 
+  // Open the Teensy recording stream; its callback will forward data to playback.
   g_capture = SDL_OpenAudioDeviceStream(teensy_dev, &teensy_spec, capture_callback, g_playback);
   if (!g_capture) {
     fprintf(stderr, "Failed to open capture: %s\n", SDL_GetError());
@@ -107,6 +121,7 @@ int audio_init(void) {
     return -1;
   }
 
+  // Start both streams once they are successfully opened.
   SDL_ResumeAudioStreamDevice(g_playback);
   SDL_ResumeAudioStreamDevice(g_capture);
 

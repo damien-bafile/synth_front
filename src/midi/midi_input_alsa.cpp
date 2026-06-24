@@ -1,3 +1,10 @@
+/// @file midi_input_alsa.cpp
+/// @brief ALSA sequencer MIDI input backend for Linux.
+///
+/// Creates a writable ALSA port, connects it to the first available (or
+/// user-named) source port, and dispatches note/CC/pitch-bend/transport
+/// events through the user callback on a dedicated reader thread.
+
 #include "midi_input.h"
 #include <alsa/asoundlib.h>
 #include <cstdio>
@@ -7,15 +14,17 @@
 #include <unistd.h>
 
 struct AlsaMidiBackend {
-  snd_seq_t* seq = nullptr;
-  int port_id = -1;
-  int source_client = -1;
-  int source_port = -1;
-  std::thread thread;
-  MidiCallback* cb_ptr = nullptr;
-  std::atomic<bool> running{false};
+  snd_seq_t* seq = nullptr;        ///< ALSA sequencer handle.
+  int port_id = -1;                ///< Our writable input port.
+  int source_client = -1;          ///< Connected source client (or -1).
+  int source_port = -1;            ///< Connected source port (or -1).
+  std::thread thread;              ///< Reader thread dispatching events.
+  MidiCallback* cb_ptr = nullptr;  ///< Pointer to heap-allocated callback.
+  std::atomic<bool> running{false};///< Set false to stop the reader thread.
 };
 
+// ALSA MIDI reader thread. Pulls events from the sequencer and translates
+// them into the common 3-byte MIDI callback format.
 static void alsa_midi_thread_func(AlsaMidiBackend* b) {
   while (b->running.load(std::memory_order_acquire)) {
     snd_seq_event_t* ev = nullptr;
@@ -32,6 +41,7 @@ static void alsa_midi_thread_func(AlsaMidiBackend* b) {
       break;
     }
 
+    // Translate ALSA sequencer events to raw MIDI messages.
     switch (ev->type) {
     case SND_SEQ_EVENT_NOTEON: {
       uint8_t ch = ev->data.note.channel & 0x0F;
@@ -87,6 +97,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
   m->cb = nullptr;
   m->running = false;
 
+  // Open the ALSA sequencer and create an application port.
   int err = snd_seq_open(&b->seq, "default", SND_SEQ_OPEN_DUPLEX, 0);
   if (err < 0) {
     fprintf(stderr, "MIDI: failed to open ALSA sequencer: %s\n", snd_strerror(err));
@@ -107,6 +118,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
     return false;
   }
 
+  // Store the callback on the heap so its address remains stable for the thread.
   auto* cb_ptr = new MidiCallback(std::move(cb));
   m->cb = cb_ptr;
   b->cb_ptr = cb_ptr;
@@ -121,6 +133,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
   int found_client = -1;
   int found_port = -1;
 
+  // Scan all readable MIDI ports, optionally filtering by source_name.
   snd_seq_client_info_set_client(cinfo, -1);
   while (snd_seq_query_next_client(b->seq, cinfo) >= 0) {
     int c = snd_seq_client_info_get_client(cinfo);
@@ -173,6 +186,7 @@ done_searching:
     fprintf(stderr, "MIDI: no MIDI input sources found, running without MIDI input.\n");
   }
 
+  // Use non-blocking reads so the thread can poll the running flag.
   snd_seq_nonblock(b->seq, 1);
 
   b->running.store(true, std::memory_order_release);
@@ -187,6 +201,7 @@ void midi_input_close(MidiInput* m) {
   if (!b)
     return;
 
+  // Closing the sequencer unblocks the reader thread's blocking input call.
   b->running.store(false, std::memory_order_release);
 
   if (b->seq) {

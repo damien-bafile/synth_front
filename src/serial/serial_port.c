@@ -1,3 +1,9 @@
+/// @file serial_port.c
+/// @brief Cross-platform serial port implementation.
+///
+/// Supports Windows (Win32 COMM API), macOS (termios + IOSSIOSPEED for custom
+/// baud rates), and Linux (termios + TCGETS2/TCSETS2 for custom baud rates).
+
 #include "serial_port.h"
 
 #ifdef _WIN32
@@ -104,6 +110,8 @@ int serial_write(int fd, const uint8_t* buf, int len) {
 
 #else
 
+// Map a numeric baud rate to the closest standard termios constant.
+// Rates above 230400 require platform-specific custom-rate ioctls below.
 static speed_t baud_to_speed(int baud) {
   switch (baud) {
   case 0:
@@ -165,16 +173,20 @@ int serial_open(const char* device, int baud) {
 
   cfmakeraw(&tty);
 
+  // Start with the nearest standard termios baud rate; override with a
+  // custom-rate ioctl later if the requested rate is non-standard/high.
   speed_t speed = baud_to_speed(baud);
   cfsetispeed(&tty, speed);
   cfsetospeed(&tty, speed);
 
+  // 8N1, no flow control, local + receiver enabled.
   tty.c_cflag |= (CLOCAL | CREAD);
   tty.c_cflag &= ~(PARENB | CSTOPB | CSIZE);
   tty.c_cflag |= CS8;
   tty.c_cflag &= ~CRTSCTS;
   tty.c_iflag &= ~(IXON | IXOFF | IXANY);
 
+  // Non-blocking reads: return immediately if no data is available.
   tty.c_cc[VMIN] = 0;
   tty.c_cc[VTIME] = 1;
 
@@ -184,6 +196,7 @@ int serial_open(const char* device, int baud) {
     return -1;
   }
 
+  // Non-standard baud rates (e.g. Teensy's 2 Mbps) need an extra ioctl.
   if (baud > 230400) {
 #ifdef __APPLE__
     if (ioctl(fd, IOSSIOSPEED, &baud) < 0) {
@@ -215,6 +228,7 @@ void serial_close(int fd) {
 
 int serial_read(int fd, uint8_t* buf, int len) {
   int n = read(fd, buf, len);
+  // Treat EAGAIN as "no data available" so callers can poll.
   if (n < 0 && errno == EAGAIN)
     return 0;
   return n;

@@ -1,3 +1,10 @@
+/// @file midi_input_win32.cpp
+/// @brief WinMM MIDI input backend for Windows.
+///
+/// Opens a MIDI input device with a callback function, pumps the MM message
+/// loop on a dedicated thread, and forwards 3-byte MIDI messages to the user
+/// callback.
+
 #include "midi_input.h"
 #include <windows.h>
 #include <mmeapi.h>
@@ -8,15 +15,17 @@
 #include <future>
 
 struct Win32MidiBackend {
-  HMIDIIN handle = nullptr;
-  UINT dev_id = 0;
-  std::thread thread;
-  DWORD thread_id = 0;
-  std::atomic<bool> running{false};
-  MidiCallback* cb_ptr = nullptr;
-  std::promise<MMRESULT> open_promise;
+  HMIDIIN handle = nullptr;        ///< Open WinMM MIDI input handle.
+  UINT dev_id = 0;                 ///< Selected device index.
+  std::thread thread;              ///< Thread running the MM message pump.
+  DWORD thread_id = 0;             ///< Thread ID used to post WM_QUIT.
+  std::atomic<bool> running{false};///< Set false to stop the message pump.
+  MidiCallback* cb_ptr = nullptr;  ///< Pointer to heap-allocated callback.
+  std::promise<MMRESULT> open_promise;///< Signals open success/failure to caller.
 };
 
+// WinMM MIDI input callback. Extracts the 3-byte MIDI message packed into
+// param1 and forwards it to the user callback.
 static void CALLBACK midi_in_callback(HMIDIIN, UINT msg, DWORD_PTR instance, DWORD_PTR param1,
                                       DWORD_PTR) {
   if (msg != MIM_DATA)
@@ -30,6 +39,8 @@ static void CALLBACK midi_in_callback(HMIDIIN, UINT msg, DWORD_PTR instance, DWO
   (*cb)(status, data1, data2);
 }
 
+// WinMM requires a message pump on the thread that opened the device. This
+// thread opens midiIn, starts it, then pumps messages until told to quit.
 static void midi_thread_func(Win32MidiBackend* b) {
   b->thread_id = GetCurrentThreadId();
 
@@ -50,6 +61,7 @@ static void midi_thread_func(Win32MidiBackend* b) {
 
   b->open_promise.set_value(MMSYSERR_NOERROR);
 
+  // Pump messages so the callback can fire on this thread.
   MSG msg;
   while (b->running.load(std::memory_order_acquire)) {
     if (GetMessage(&msg, nullptr, 0, 0) > 0) {
@@ -69,6 +81,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
   m->cb = nullptr;
   m->running = false;
 
+  // Pick the first device, or the first device whose name contains source_name.
   UINT num_devs = midiInGetNumDevs();
   UINT dev_id = 0;
   bool found = false;
@@ -100,6 +113,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
     return true;
   }
 
+  // Store the callback on the heap so its address remains stable for WinMM.
   auto* cb_ptr = new MidiCallback(std::move(cb));
   m->cb = cb_ptr;
   b->cb_ptr = cb_ptr;
@@ -107,6 +121,7 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
 
   auto open_future = b->open_promise.get_future();
 
+  // Start the message-pump thread and wait for it to finish opening the device.
   b->running.store(true, std::memory_order_release);
   b->thread = std::thread(midi_thread_func, b);
 
@@ -133,6 +148,7 @@ void midi_input_close(MidiInput* m) {
   if (!b)
     return;
 
+  // Signal the message loop to exit and wait for the thread to shut down.
   b->running.store(false, std::memory_order_release);
 
   if (b->thread.joinable()) {

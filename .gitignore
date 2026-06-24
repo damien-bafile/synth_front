@@ -5,3 +5,5 @@ graphify-out/
 .DS_Store
 .vscode/
 .clang-format
+node_modules/
+imgui.ini

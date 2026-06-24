@@ -91,6 +91,7 @@ bool renderer_init(Renderer* r, SDL_Window* window) {
     char info[512];
     glGetProgramInfoLog(r->program, 512, nullptr, info);
     fprintf(stderr, "Program link error: %s\n", info);
+    glDeleteProgram(r->program);
     return false;
   }
 

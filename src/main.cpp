@@ -49,9 +49,11 @@ struct MidiEvent {
 };
 
 static constexpr int MIDI_QUEUE_SIZE = 256;
+static constexpr int SERIAL_BUF_SIZE = 65536;
+static constexpr int READ_TIMEOUT_MS = 2000;
 static MidiEvent g_midi_queue[MIDI_QUEUE_SIZE];
 static std::atomic<int> g_midi_head{0};
-static int g_midi_tail = 0;
+static std::atomic<int> g_midi_tail{0};
 
 // Close a serial or TCP connection by its file descriptor.
 static void conn_close(int fd) {
@@ -116,12 +118,12 @@ static void window_to_fb(float mx, float my, const Renderer& r, uint16_t& tx, ui
     ry = 0.0f;
   if (ry > 1.0f)
     ry = 1.0f;
-  tx = (uint16_t)(rx * 320.0f);
-  ty = (uint16_t)(ry * 480.0f);
-  if (tx >= 320)
-    tx = 319;
-  if (ty >= 480)
-    ty = 479;
+  tx = (uint16_t)(rx * FB_WIDTH);
+  ty = (uint16_t)(ry * FB_HEIGHT);
+  if (tx >= FB_WIDTH)
+    tx = FB_WIDTH - 1;
+  if (ty >= FB_HEIGHT)
+    ty = FB_HEIGHT - 1;
 }
 
 // Convert an RGB565 pixel buffer to RGB888 for OpenGL texture upload.
@@ -137,7 +139,7 @@ static void convert_rgb565_to_rgb888(const uint8_t* src, uint8_t* dst, int pixel
 
 // Background thread: read packets from serial/TCP, parse frame tiles and debug messages.
 static void serial_thread_func() {
-  static uint8_t buf[65536];
+  static uint8_t buf[SERIAL_BUF_SIZE];
   int buf_len = 0;
   uint32_t last_data_time = SDL_GetTicks();
 
@@ -147,7 +149,7 @@ static void serial_thread_func() {
       SDL_Delay(10);
       continue;
     }
-    int n = serial_read(fd, buf + buf_len, (int)sizeof(buf) - buf_len);
+    int n = serial_read(fd, buf + buf_len, static_cast<int>(sizeof(buf)) - buf_len);
     if (n < 0) {
       conn_close(fd);
       g_conn_fd.store(-1, std::memory_order_relaxed);
@@ -157,7 +159,7 @@ static void serial_thread_func() {
       continue;
     }
     if (n == 0) {
-      if (SDL_GetTicks() - last_data_time > 2000) {
+      if (SDL_GetTicks() - last_data_time > READ_TIMEOUT_MS) {
         conn_close(fd);
         g_conn_fd.store(-1, std::memory_order_relaxed);
         g_connected.store(false, std::memory_order_release);
@@ -309,8 +311,11 @@ int main(int argc, char* argv[]) {
                     }
                     // Push channel messages into the lock-free ring buffer.
                     int slot = g_midi_head.load(std::memory_order_relaxed);
-                    g_midi_queue[slot % MIDI_QUEUE_SIZE] = {type, channel, data1, data2};
-                    g_midi_head.store(slot + 1, std::memory_order_release);
+                    int tail = g_midi_tail.load(std::memory_order_acquire);
+                    if (slot - tail < MIDI_QUEUE_SIZE) {
+                      g_midi_queue[slot % MIDI_QUEUE_SIZE] = {type, channel, data1, data2};
+                      g_midi_head.store(slot + 1, std::memory_order_release);
+                    }
                   });
 
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);

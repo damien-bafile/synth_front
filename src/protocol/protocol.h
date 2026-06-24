@@ -71,7 +71,7 @@ int packet_parse(const uint8_t* buf, int len, Packet* out);
 /// @param len     Number of payload bytes.
 /// @note          This function is not intrinsically thread-safe; callers must
 ///                serialize access to @p fd if multiple threads may write.
-void packet_send(int fd, PacketType type, const uint8_t* payload, size_t len);
+int packet_send(int fd, PacketType type, const uint8_t* payload, size_t len);
 
 /// Send an encoder delta packet.
 /// @param fd    Open connection file descriptor.

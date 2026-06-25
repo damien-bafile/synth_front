@@ -382,8 +382,11 @@ int main(int argc, char* argv[]) {
     if (!g_connected.load(std::memory_order_acquire))
       try_reconnect();
 
-    int pw, ph;
+    int pw, ph, ww, wh;
     SDL_GetWindowSizeInPixels(window, &pw, &ph);
+    SDL_GetWindowSize(window, &ww, &wh);
+    float dpi_scale_x = (ww > 0) ? (float)pw / ww : 1.0f;
+    float dpi_scale_y = (wh > 0) ? (float)ph / wh : 1.0f;
 
     while (SDL_PollEvent(&event)) {
       ImGui_ImplSDL3_ProcessEvent(&event);
@@ -396,7 +399,7 @@ int main(int argc, char* argv[]) {
       case SDL_EVENT_MOUSE_BUTTON_DOWN: {
         mouse_down = true;
         uint16_t tx, ty;
-        window_to_fb(event.button.x, event.button.y, renderer, tx, ty);
+        window_to_fb(event.button.x * dpi_scale_x, event.button.y * dpi_scale_y, renderer, tx, ty);
         if (!(g_show_ui
               && event.button.x >= g_ui_x && event.button.x < g_ui_x + g_ui_w
               && event.button.y >= g_ui_y && event.button.y < g_ui_y + g_ui_h))
@@ -406,7 +409,7 @@ int main(int argc, char* argv[]) {
       case SDL_EVENT_MOUSE_BUTTON_UP: {
         mouse_down = false;
         uint16_t tx, ty;
-        window_to_fb(event.button.x, event.button.y, renderer, tx, ty);
+        window_to_fb(event.button.x * dpi_scale_x, event.button.y * dpi_scale_y, renderer, tx, ty);
         if (!(g_show_ui
               && event.button.x >= g_ui_x && event.button.x < g_ui_x + g_ui_w
               && event.button.y >= g_ui_y && event.button.y < g_ui_y + g_ui_h))
@@ -420,7 +423,7 @@ int main(int argc, char* argv[]) {
         if (g_show_ui && mx >= g_ui_x && mx < g_ui_x + g_ui_w && my >= g_ui_y && my < g_ui_y + g_ui_h)
           break;
         uint16_t tx, ty;
-        window_to_fb(mx, my, renderer, tx, ty);
+        window_to_fb(mx * dpi_scale_x, my * dpi_scale_y, renderer, tx, ty);
         send_touch(g_conn_fd, tx, ty, true);
         break;
       }

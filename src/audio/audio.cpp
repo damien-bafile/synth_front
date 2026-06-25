@@ -32,6 +32,30 @@ static const char* sample_format_name(SDL_AudioFormat fmt) {
   }
 }
 
+static SDL_AudioDeviceID find_playback_device(const char* hint) {
+  int count = 0;
+  SDL_AudioDeviceID* devices = SDL_GetAudioPlaybackDevices(&count);
+  if (!devices)
+    return SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+
+  if (hint) {
+    for (int i = 0; i < count; i++) {
+      const char* name = SDL_GetAudioDeviceName(devices[i]);
+      if (name && strstr(name, hint)) {
+        fprintf(stderr, "Matched playback device: %s\n", name);
+        SDL_free(devices);
+        return devices[i];
+      }
+    }
+    fprintf(stderr, "No playback device matching \"%s\" found. Available playback devices:\n", hint);
+    for (int i = 0; i < count; i++)
+      fprintf(stderr, "  %s\n", SDL_GetAudioDeviceName(devices[i]));
+  }
+
+  SDL_free(devices);
+  return SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK;
+}
+
 static SDL_AudioDeviceID find_teensy_audio_device(void) {
   int count = 0;
   SDL_AudioDeviceID* devices = SDL_GetAudioRecordingDevices(&count);
@@ -81,7 +105,7 @@ static void SDLCALL capture_callback(void* userdata, SDL_AudioStream* stream, in
   }
 }
 
-int audio_init(void) {
+int audio_init(const char* playback_device_hint) {
   SDL_AudioDeviceID teensy_dev = find_teensy_audio_device();
   if (!teensy_dev)
     return -1;
@@ -96,14 +120,19 @@ int audio_init(void) {
   fprintf(stderr, "Teensy audio format: %d Hz, %d ch, %s\n", teensy_spec.freq,
           teensy_spec.channels, sample_format_name(teensy_spec.format));
 
-  // Open the default playback device with the same spec as the Teensy so SDL
-  // does not need to resample.
-  g_playback =
-      SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &teensy_spec, nullptr, nullptr);
+  // Open the playback device (chosen by hint or default) with the same spec as
+  // the Teensy so SDL does not need to resample.
+  SDL_AudioDeviceID pb_dev = find_playback_device(playback_device_hint);
+  g_playback = SDL_OpenAudioDeviceStream(pb_dev, &teensy_spec, nullptr, nullptr);
   if (!g_playback) {
     fprintf(stderr, "Failed to open playback: %s\n", SDL_GetError());
     return -1;
   }
+
+  fprintf(stderr, "Playback device: %s\n",
+          pb_dev == SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK
+              ? "(default)"
+              : SDL_GetAudioDeviceName(pb_dev));
 
   SDL_AudioSpec pb_spec;
   SDL_zero(pb_spec);

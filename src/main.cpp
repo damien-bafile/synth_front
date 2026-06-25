@@ -224,6 +224,8 @@ static void serial_thread_func() {
       default:
         break;
       }
+      if (!g_connected.load(std::memory_order_relaxed))
+        g_connected.store(true, std::memory_order_release);
       consumed += parsed;
     }
 
@@ -248,12 +250,14 @@ static void try_reconnect() {
     return;
   }
   g_conn_fd.store(fd, std::memory_order_relaxed);
+  g_connected.store(true, std::memory_order_release);
 }
 
 // Entry point: open serial/TCP, set up SDL/OpenGL window, run render loop with key handling.
 int main(int argc, char* argv[]) {
   std::string port;
   std::string midi_source;
+  std::string audio_output;
 
   for (int i = 1; i < argc; i++) {
     if (std::strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
@@ -267,6 +271,22 @@ int main(int argc, char* argv[]) {
       return 0;
     } else if (std::strcmp(argv[i], "--midi-source") == 0 && i + 1 < argc) {
       midi_source = argv[++i];
+    } else if (std::strcmp(argv[i], "--audio-output") == 0 && i + 1 < argc) {
+      audio_output = argv[++i];
+    } else if (std::strcmp(argv[i], "--list-audio") == 0) {
+      int count = 0;
+      SDL_AudioDeviceID* devs;
+      fprintf(stderr, "Audio playback devices:\n");
+      devs = SDL_GetAudioPlaybackDevices(&count);
+      for (int j = 0; j < count; j++)
+        fprintf(stderr, "  %s\n", SDL_GetAudioDeviceName(devs[j]));
+      SDL_free(devs);
+      fprintf(stderr, "Audio recording devices:\n");
+      devs = SDL_GetAudioRecordingDevices(&count);
+      for (int j = 0; j < count; j++)
+        fprintf(stderr, "  %s\n", SDL_GetAudioDeviceName(devs[j]));
+      SDL_free(devs);
+      return 0;
     }
   }
 
@@ -342,7 +362,7 @@ int main(int argc, char* argv[]) {
 
   framebuffer_init(320, 480);
 
-  audio_init();
+  audio_init(audio_output.empty() ? nullptr : audio_output.c_str());
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -511,9 +531,10 @@ int main(int argc, char* argv[]) {
     // Build the ImGui overlay window.
     if (g_show_ui) {
       ImGui::SetNextWindowPos(ImVec2((float)pw * 0.5f, 0.0f), ImGuiCond_Appearing, ImVec2(0.5f, 0.0f));
-      ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar;
+      ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoResize;
+      ImGui::SetNextWindowSize(ImVec2(350.0f, 0.0f), ImGuiCond_Appearing);
       bool connected = g_connected.load(std::memory_order_acquire);
-      const char* title = connected ? "Menu" : "Disconnected";
+      const char* title = connected ? "Connected" : "Disconnected";
       if (!connected)
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.5f, 0.08f, 0.08f, 1.0f));
       if (ImGui::Begin(title, nullptr, window_flags)) {
@@ -522,6 +543,9 @@ int main(int argc, char* argv[]) {
         ImGui::SameLine();
         if (ImGui::Button("Close"))
           running = false;
+        ImGui::SameLine();
+        if (ImGui::Button("Hide"))
+          g_show_ui = false;
 
         ImVec2 pos = ImGui::GetWindowPos();
         ImVec2 sz = ImGui::GetWindowSize();

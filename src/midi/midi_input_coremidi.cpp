@@ -120,11 +120,9 @@ void midi_input_close(MidiInput* m) {
     return;
 
   // Disconnect and dispose in reverse order of creation.
-    if (b->endpoint) {
-      MIDIPortDisconnectSource(b->port, b->endpoint);
-    }
-    MIDIPortDispose(b->port);
-  }
+  if (b->endpoint)
+    MIDIPortDisconnectSource(b->port, b->endpoint);
+  MIDIPortDispose(b->port);
   if (b->client) {
     MIDIClientDispose(b->client);
   }

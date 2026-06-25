@@ -7,7 +7,7 @@ host-side front-end for a Teensy-based groovebox.
 
 - **Language:** C++20 with some C modules.
 - **Build system:** CMake 3.16+ with Ninja.
-- **Primary deps:** SDL3 (windowing, OpenGL, audio, input), Nuklear (single-header UI).
+- **Primary deps:** SDL3 (windowing, OpenGL, audio, input), Dear ImGui (UI).
 - **Platforms:** Linux, macOS, Windows (MSYS2/MinGW).
 
 ## Build commands
@@ -44,7 +44,7 @@ audio device.
   thread-safety / ownership notes.
 - **Implementation files** start with a `@file` block explaining the module's
   responsibility, followed by brief inline `//` comments for non-obvious logic.
-- **Third-party code** (`src/ui/nuklear.h`, vendored shaders) should generally
+- **Third-party code** (vendored shaders) should generally
   not be reformatted or heavily commented.
 
 ### C++ guidance
@@ -80,11 +80,11 @@ If you refactor this, prefer encapsulating the globals rather than adding more.
 | `src/input/` | SDL keycode → synth action mapping | Returns `InputResult` for main.cpp to route. |
 | `src/midi/` | Platform MIDI input | One of `_alsa`, `_coremidi`, `_win32` is compiled per platform. |
 | `src/audio/` | SDL3 audio passthrough | Plain C interface. |
-| `src/ui/` | Nuklear backend + implementation | Do not edit `nuklear.h`; keep `nuklear_impl.cpp` minimal. |
+| `src/ui/` | (unused — ImGui configured in main.cpp) | |
 
 ## Things to avoid
 
-- Do not modify `src/ui/nuklear.h` (third-party single-header library).
+
 - Do not change the wire-format packet type values in `src/protocol/protocol.h`
   without also updating the Teensy firmware.
 - Do not assume all MIDI source files compile on every platform; only one is

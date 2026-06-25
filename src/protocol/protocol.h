@@ -16,7 +16,6 @@
 enum class PacketType : uint8_t {
   KEY_DOWN = 0x01,   ///< Physical/front-panel key pressed.
   KEY_UP   = 0x02,   ///< Physical/front-panel key released.
-  PING     = 0x04,   ///< Keep-alive / latency probe.
   ENCODER  = 0x05,   ///< Rotary encoder movement: payload [index, delta_hi, delta_lo].
   TOUCH    = 0x08,   ///< Touch-screen event: payload [x_hi, x_lo, y_hi, y_lo, state].
 

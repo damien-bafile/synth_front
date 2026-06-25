@@ -61,7 +61,7 @@ TEST(ProtocolTest, LargePayload) {
 
 TEST(ProtocolTest, AllPacketTypesRoundTrip) {
   PacketType types[] = {
-      PacketType::KEY_DOWN,   PacketType::KEY_UP, PacketType::PING,
+      PacketType::KEY_DOWN,   PacketType::KEY_UP,
       PacketType::ENCODER,    PacketType::TOUCH,  PacketType::FRAME,
       PacketType::DEBUG,      PacketType::READY,  PacketType::FRAME_TILE,
       PacketType::MIDI_NOTE_ON, PacketType::MIDI_NOTE_OFF, PacketType::MIDI_CC,

@@ -39,6 +39,7 @@ static std::atomic<int> g_conn_fd{-1};
 static std::mutex g_serial_mutex;
 static std::atomic<bool> g_show_ui{false};
 static std::atomic<bool> g_connected{false};
+static std::atomic<bool> g_audio_active{false};
 static float g_ui_x = 0, g_ui_y = 0, g_ui_w = 640, g_ui_h = 50;
 
 struct MidiEvent {
@@ -154,6 +155,7 @@ static void serial_thread_func() {
       conn_close(fd);
       g_conn_fd.store(-1, std::memory_order_relaxed);
       g_connected.store(false, std::memory_order_release);
+      g_audio_active.store(false, std::memory_order_release);
       framebuffer_clear();
       buf_len = 0;
       continue;
@@ -163,6 +165,7 @@ static void serial_thread_func() {
         conn_close(fd);
         g_conn_fd.store(-1, std::memory_order_relaxed);
         g_connected.store(false, std::memory_order_release);
+        g_audio_active.store(false, std::memory_order_release);
         framebuffer_clear();
         buf_len = 0;
         continue;
@@ -362,7 +365,8 @@ int main(int argc, char* argv[]) {
 
   framebuffer_init(320, 480);
 
-  audio_init(audio_output.empty() ? nullptr : audio_output.c_str());
+  g_audio_active.store(audio_init(audio_output.empty() ? nullptr : audio_output.c_str()) == 0,
+                       std::memory_order_release);
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
@@ -381,6 +385,10 @@ int main(int argc, char* argv[]) {
   while (running) {
     if (!g_connected.load(std::memory_order_acquire))
       try_reconnect();
+    if (g_connected.load(std::memory_order_acquire)
+        && !g_audio_active.load(std::memory_order_acquire))
+      if (audio_restart() == 0)
+        g_audio_active.store(true, std::memory_order_release);
 
     int pw, ph, ww, wh;
     SDL_GetWindowSizeInPixels(window, &pw, &ph);

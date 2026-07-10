@@ -17,6 +17,13 @@ extern "C" {
 /// @return 0 on success, -1 on failure (errors are printed to stderr).
 int audio_init(const char* playback_device_hint);
 
+/// Stop and restart audio streaming.
+/// Calls audio_shutdown() then audio_init() with the same hint from the last
+/// successful audio_init() call.  Safe to call repeatedly (harmless if audio
+/// was never initialized).
+/// @return 0 on success, -1 on failure.
+int audio_restart(void);
+
 /// Stop audio streaming and close all audio devices.
 void audio_shutdown(void);
 

@@ -10,11 +10,13 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+#include <string>
 
 static constexpr int AUDIO_BUF_SIZE = 4096;
 
 static SDL_AudioStream* g_capture = nullptr;
 static SDL_AudioStream* g_playback = nullptr;
+static std::string s_playback_hint;
 
 // Convert SDL audio format enum to a short human-readable name for logging.
 static const char* sample_format_name(SDL_AudioFormat fmt) {
@@ -106,6 +108,8 @@ static void SDLCALL capture_callback(void* userdata, SDL_AudioStream* stream, in
 }
 
 int audio_init(const char* playback_device_hint) {
+  s_playback_hint = playback_device_hint ? playback_device_hint : "";
+
   SDL_AudioDeviceID teensy_dev = find_teensy_audio_device();
   if (!teensy_dev)
     return -1;
@@ -155,6 +159,16 @@ int audio_init(const char* playback_device_hint) {
 
   fprintf(stderr, "Audio passthrough active: Teensy -> speakers\n");
   return 0;
+}
+
+int audio_restart(void) {
+  audio_shutdown();
+  const char* hint = s_playback_hint.empty() ? nullptr : s_playback_hint.c_str();
+  if (audio_init(hint) == 0) {
+    fprintf(stderr, "Audio restarted successfully.\n");
+    return 0;
+  }
+  return -1;
 }
 
 void audio_shutdown(void) {

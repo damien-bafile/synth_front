@@ -37,7 +37,7 @@
 static std::atomic<bool> g_running{true};
 static std::atomic<int> g_conn_fd{-1};
 static std::mutex g_serial_mutex;
-static std::atomic<bool> g_show_ui{true};
+static std::atomic<bool> g_show_ui{false};
 static std::atomic<bool> g_connected{false};
 static float g_ui_x = 0, g_ui_y = 0, g_ui_w = 640, g_ui_h = 50;
 

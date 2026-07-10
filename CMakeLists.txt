@@ -83,7 +83,7 @@ endif()
 if(MSVC)
   target_compile_options(${PROJECT_NAME} PRIVATE /W4 /WX)
 else()
-  target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wextra -Wpedantic)
+  target_compile_options(${PROJECT_NAME} PRIVATE -Werror -Wall -Wextra -Wpedantic -Wno-nullability-extension -Wno-c99-extensions -Wno-nested-anon-types -Wno-import-preprocessor-directive-pedantic)
 endif()
 target_link_libraries(${PROJECT_NAME} PRIVATE SDL3::SDL3)
 

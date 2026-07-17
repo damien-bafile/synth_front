@@ -1,16 +1,9 @@
-#include "unity.h"
-#include "unity_fixture.h"
+#include <gtest/gtest.h>
 #include <cstring>
 #include "protocol/framebuffer.h"
 
-TEST_GROUP(Framebuffer);
-
-TEST_SETUP(Framebuffer) {}
-TEST_TEAR_DOWN(Framebuffer) {}
-
-TEST(Framebuffer, InitAndGetFrame)
-{
-  TEST_ASSERT_TRUE(framebuffer_init(320, 480));
+TEST(FramebufferTest, InitAndGetFrame) {
+  ASSERT_TRUE(framebuffer_init(320, 480));
 
   uint8_t tile_data[32 * 32 * 2] = {};
   framebuffer_write_tile(0, 0, 32, 32, tile_data);
@@ -20,26 +13,23 @@ TEST(Framebuffer, InitAndGetFrame)
   uint8_t out[FB_RGB565_SIZE];
   int w, h;
   bool got = framebuffer_get(out, &w, &h);
-  TEST_ASSERT_TRUE(got);
-  TEST_ASSERT_EQUAL_INT(320, w);
-  TEST_ASSERT_EQUAL_INT(480, h);
+  EXPECT_TRUE(got);
+  EXPECT_EQ(w, 320);
+  EXPECT_EQ(h, 480);
 }
 
-TEST(Framebuffer, NoFrameAvailable)
-{
+TEST(FramebufferTest, NoFrameAvailable) {
   framebuffer_init(320, 480);
   uint8_t out[FB_RGB565_SIZE];
   int w, h;
-  TEST_ASSERT_FALSE(framebuffer_get(out, &w, &h));
+  EXPECT_FALSE(framebuffer_get(out, &w, &h));
 }
 
-TEST(Framebuffer, RejectsOversized)
-{
-  TEST_ASSERT_FALSE(framebuffer_init(1000, 1000));
+TEST(FramebufferTest, RejectsOversized) {
+  EXPECT_FALSE(framebuffer_init(1000, 1000));
 }
 
-TEST(Framebuffer, DoubleBuffering)
-{
+TEST(FramebufferTest, DoubleBuffering) {
   framebuffer_init(320, 480);
 
   uint8_t frame_a[32 * 480 * 2] = {};
@@ -53,22 +43,21 @@ TEST(Framebuffer, DoubleBuffering)
 
   uint8_t out[FB_RGB565_SIZE];
   int w, h;
-  TEST_ASSERT_TRUE(framebuffer_get(out, &w, &h));
-  TEST_ASSERT_EQUAL_UINT8(0xAA, out[0]);
+  ASSERT_TRUE(framebuffer_get(out, &w, &h));
+  EXPECT_EQ(out[0], 0xAA);
 }
 
-TEST(Framebuffer, MultipleFrames)
-{
+TEST(FramebufferTest, MultipleFrames) {
   framebuffer_init(320, 480);
 
   for (int frame = 0; frame < 5; frame++) {
     uint8_t tile[64 * 64 * 2] = {};
-    tile[0] = (uint8_t)frame;
+    tile[0] = frame;
     framebuffer_write_tile(0, 0, 64, 64, tile);
     framebuffer_finish_frame();
 
     uint8_t out[FB_RGB565_SIZE];
     int w, h;
-    TEST_ASSERT_TRUE(framebuffer_get(out, &w, &h));
+    ASSERT_TRUE(framebuffer_get(out, &w, &h));
   }
 }

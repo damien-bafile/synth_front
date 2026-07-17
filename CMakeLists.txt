@@ -114,31 +114,35 @@ endif()
 
 # -- Tests -------------------------------------------------------------------
 FetchContent_Declare(
-  GTest
-  GIT_REPOSITORY https://github.com/google/googletest.git
-  GIT_TAG v1.15.2
+  Unity
+  GIT_REPOSITORY https://github.com/ThrowTheSwitch/Unity.git
+  GIT_TAG v2.6.0
   GIT_SHALLOW TRUE
 )
-FetchContent_MakeAvailable(GTest)
-
-if(APPLE)
-  target_compile_options(gtest PRIVATE -Wno-character-conversion)
-  target_compile_options(gtest_main PRIVATE -Wno-character-conversion)
-endif()
+FetchContent_MakeAvailable(Unity)
 
 enable_testing()
-include(GoogleTest)
 
 set(TEST_SOURCES
+  "${CMAKE_SOURCE_DIR}/tests/test_main.cpp"
   "${CMAKE_SOURCE_DIR}/tests/test_protocol.cpp"
   "${CMAKE_SOURCE_DIR}/tests/test_framebuffer.cpp"
+  "${CMAKE_SOURCE_DIR}/tests/test_input.cpp"
 )
 
 add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES}
   "${CMAKE_SOURCE_DIR}/src/protocol/packet.cpp"
   "${CMAKE_SOURCE_DIR}/src/protocol/framebuffer.cpp"
   "${CMAKE_SOURCE_DIR}/src/serial/serial_port.c"
+  "${CMAKE_SOURCE_DIR}/src/input/input.cpp"
+  "${unity_SOURCE_DIR}/src/unity.c"
+  "${unity_SOURCE_DIR}/extras/fixture/src/unity_fixture.c"
 )
 target_include_directories(${PROJECT_NAME}_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(${PROJECT_NAME}_tests PRIVATE GTest::gtest_main)
-gtest_discover_tests(${PROJECT_NAME}_tests)
+target_include_directories(${PROJECT_NAME}_tests PRIVATE "${unity_SOURCE_DIR}/src")
+target_include_directories(${PROJECT_NAME}_tests PRIVATE "${unity_SOURCE_DIR}/extras/fixture/src")
+target_include_directories(${PROJECT_NAME}_tests PRIVATE "${unity_SOURCE_DIR}/extras/memory/src")
+target_compile_definitions(${PROJECT_NAME}_tests PRIVATE UNITY_INCLUDE_FIXTURE_H)
+target_link_libraries(${PROJECT_NAME}_tests PRIVATE SDL3::SDL3)
+
+add_test(NAME synth_front_tests COMMAND ${PROJECT_NAME}_tests)

@@ -1,9 +1,16 @@
-#include <gtest/gtest.h>
+#include "unity.h"
+#include "unity_fixture.h"
 #include <cstring>
 #include "protocol/framebuffer.h"
 
-TEST(FramebufferTest, InitAndGetFrame) {
-  ASSERT_TRUE(framebuffer_init(320, 480));
+TEST_GROUP(Framebuffer);
+
+TEST_SETUP(Framebuffer) {}
+TEST_TEAR_DOWN(Framebuffer) {}
+
+TEST(Framebuffer, InitAndGetFrame)
+{
+  TEST_ASSERT_TRUE(framebuffer_init(320, 480));
 
   uint8_t tile_data[32 * 32 * 2] = {};
   framebuffer_write_tile(0, 0, 32, 32, tile_data);
@@ -13,23 +20,26 @@ TEST(FramebufferTest, InitAndGetFrame) {
   uint8_t out[FB_RGB565_SIZE];
   int w, h;
   bool got = framebuffer_get(out, &w, &h);
-  EXPECT_TRUE(got);
-  EXPECT_EQ(w, 320);
-  EXPECT_EQ(h, 480);
+  TEST_ASSERT_TRUE(got);
+  TEST_ASSERT_EQUAL_INT(320, w);
+  TEST_ASSERT_EQUAL_INT(480, h);
 }
 
-TEST(FramebufferTest, NoFrameAvailable) {
+TEST(Framebuffer, NoFrameAvailable)
+{
   framebuffer_init(320, 480);
   uint8_t out[FB_RGB565_SIZE];
   int w, h;
-  EXPECT_FALSE(framebuffer_get(out, &w, &h));
+  TEST_ASSERT_FALSE(framebuffer_get(out, &w, &h));
 }
 
-TEST(FramebufferTest, RejectsOversized) {
-  EXPECT_FALSE(framebuffer_init(1000, 1000));
+TEST(Framebuffer, RejectsOversized)
+{
+  TEST_ASSERT_FALSE(framebuffer_init(1000, 1000));
 }
 
-TEST(FramebufferTest, DoubleBuffering) {
+TEST(Framebuffer, DoubleBuffering)
+{
   framebuffer_init(320, 480);
 
   uint8_t frame_a[32 * 480 * 2] = {};
@@ -40,25 +50,25 @@ TEST(FramebufferTest, DoubleBuffering) {
   uint8_t frame_b[32 * 480 * 2] = {};
   std::memset(frame_b, 0xBB, sizeof(frame_b));
   framebuffer_write_tile(0, 0, 32, 480, frame_b);
-  // Don't finish — the first frame should still be readable
 
   uint8_t out[FB_RGB565_SIZE];
   int w, h;
-  ASSERT_TRUE(framebuffer_get(out, &w, &h));
-  EXPECT_EQ(out[0], 0xAA);
+  TEST_ASSERT_TRUE(framebuffer_get(out, &w, &h));
+  TEST_ASSERT_EQUAL_UINT8(0xAA, out[0]);
 }
 
-TEST(FramebufferTest, MultipleFrames) {
+TEST(Framebuffer, MultipleFrames)
+{
   framebuffer_init(320, 480);
 
   for (int frame = 0; frame < 5; frame++) {
     uint8_t tile[64 * 64 * 2] = {};
-    tile[0] = frame;
+    tile[0] = (uint8_t)frame;
     framebuffer_write_tile(0, 0, 64, 64, tile);
     framebuffer_finish_frame();
 
     uint8_t out[FB_RGB565_SIZE];
     int w, h;
-    ASSERT_TRUE(framebuffer_get(out, &w, &h));
+    TEST_ASSERT_TRUE(framebuffer_get(out, &w, &h));
   }
 }

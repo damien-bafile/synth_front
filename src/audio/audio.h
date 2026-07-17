@@ -24,6 +24,13 @@ int audio_init(const char* playback_device_hint);
 /// @return 0 on success, -1 on failure.
 int audio_restart(void);
 
+/// Stop and restart audio streaming with a new playback device hint.
+/// @param playback_device_hint  If non-null, select a playback device whose name
+///                              contains this substring.  If null or no match is
+///                              found, the system default playback device is used.
+/// @return 0 on success, -1 on failure.
+int audio_restart_with(const char* playback_device_hint);
+
 /// Stop audio streaming and close all audio devices.
 void audio_shutdown(void);
 

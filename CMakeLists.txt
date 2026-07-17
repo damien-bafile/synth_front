@@ -68,6 +68,7 @@ set(SOURCES
   "${CMAKE_SOURCE_DIR}/src/render/renderer.cpp"
   "${CMAKE_SOURCE_DIR}/src/serial/serial_port.c"
   "${CMAKE_SOURCE_DIR}/src/serial/usb_detect.cpp"
+  "${CMAKE_SOURCE_DIR}/src/ui/device_panel.cpp"
   ${IMGUI_SOURCES}
 )
 

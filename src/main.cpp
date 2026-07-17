@@ -30,6 +30,7 @@
 #include "input/input.h"
 #include "midi/midi_input.h"
 #include "audio/audio.h"
+#include "ui/device_panel.h"
 #include "imgui.h"
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -277,6 +278,7 @@ int main(int argc, char* argv[]) {
     } else if (std::strcmp(argv[i], "--audio-output") == 0 && i + 1 < argc) {
       audio_output = argv[++i];
     } else if (std::strcmp(argv[i], "--list-audio") == 0) {
+      SDL_Init(SDL_INIT_AUDIO);
       int count = 0;
       SDL_AudioDeviceID* devs;
       fprintf(stderr, "Audio playback devices:\n");
@@ -289,6 +291,7 @@ int main(int argc, char* argv[]) {
       for (int j = 0; j < count; j++)
         fprintf(stderr, "  %s\n", SDL_GetAudioDeviceName(devs[j]));
       SDL_free(devs);
+      SDL_Quit();
       return 0;
     }
   }
@@ -542,21 +545,38 @@ int main(int argc, char* argv[]) {
     // Build the ImGui overlay window.
     if (g_show_ui) {
       ImGui::SetNextWindowPos(ImVec2((float)pw * 0.5f, 0.0f), ImGuiCond_Appearing, ImVec2(0.5f, 0.0f));
-      ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoResize;
-      ImGui::SetNextWindowSize(ImVec2(350.0f, 0.0f), ImGuiCond_Appearing);
+      ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar;
+      ImGui::SetNextWindowSize(ImVec2(520.0f, 360.0f), ImGuiCond_FirstUseEver);
       bool connected = g_connected.load(std::memory_order_acquire);
       const char* title = connected ? "Connected" : "Disconnected";
       if (!connected)
         ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.5f, 0.08f, 0.08f, 1.0f));
       if (ImGui::Begin(title, nullptr, window_flags)) {
-        if (ImGui::Button("Restart"))
-          packet_send(g_conn_fd, PacketType::RESET, nullptr, 0);
+
+        if (ImGui::BeginTabBar("MainTabs")) {
+          if (ImGui::BeginTabItem("Status")) {
+            if (ImGui::Button("Hide"))
+              g_show_ui = false;
+            ImGui::SameLine();
+            if (ImGui::Button("Restart"))
+              packet_send(g_conn_fd, PacketType::RESET, nullptr, 0);
+            ImGui::SameLine();
+            if (ImGui::Button("Close"))
+              running = false;
+            ImGui::EndTabItem();
+          }
+          RenderDeviceTabs(g_connected, g_audio_active, g_conn_fd);
+          ImGui::EndTabBar();
+        }
+
+        ImGui::Separator();
+        bool conn = g_connected.load(std::memory_order_acquire);
+        bool aud_active = g_audio_active.load(std::memory_order_acquire);
+        ImGui::TextColored(conn ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+                           "Serial: %s", conn ? "Connected" : "Disconnected");
         ImGui::SameLine();
-        if (ImGui::Button("Close"))
-          running = false;
-        ImGui::SameLine();
-        if (ImGui::Button("Hide"))
-          g_show_ui = false;
+        ImGui::TextColored(aud_active ? ImVec4(0.3f, 1.0f, 0.3f, 1.0f) : ImVec4(1.0f, 0.3f, 0.3f, 1.0f),
+                           "| Audio: %s", aud_active ? "Active" : "Inactive");
 
         ImVec2 pos = ImGui::GetWindowPos();
         ImVec2 sz = ImGui::GetWindowSize();

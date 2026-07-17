@@ -28,6 +28,7 @@
 #include "protocol/framebuffer.h"
 #include "render/renderer.h"
 #include "input/input.h"
+#include "protocol/convert.h"
 #include "midi/midi_input.h"
 #include "audio/audio.h"
 #include "ui/device_panel.h"
@@ -102,41 +103,6 @@ static void send_touch(int fd, uint16_t x, uint16_t y, bool pressed) {
   if (fd < 0) return;
   std::lock_guard<std::mutex> lock(g_serial_mutex);
   packet_send_touch(fd, x, y, pressed ? 1 : 0);
-}
-
-// Map window-logical coordinates to framebuffer coordinates, correcting for letterbox viewport.
-static void window_to_fb(float mx, float my, const Renderer& r, uint16_t& tx, uint16_t& ty) {
-  if (r.vp_w == 0 || r.vp_h == 0) {
-    tx = ty = 0;
-    return;
-  }
-  float rx = (mx - r.vp_x) / r.vp_w;
-  float ry = (my - r.vp_y) / r.vp_h;
-  if (rx < 0.0f)
-    rx = 0.0f;
-  if (rx > 1.0f)
-    rx = 1.0f;
-  if (ry < 0.0f)
-    ry = 0.0f;
-  if (ry > 1.0f)
-    ry = 1.0f;
-  tx = (uint16_t)(rx * FB_WIDTH);
-  ty = (uint16_t)(ry * FB_HEIGHT);
-  if (tx >= FB_WIDTH)
-    tx = FB_WIDTH - 1;
-  if (ty >= FB_HEIGHT)
-    ty = FB_HEIGHT - 1;
-}
-
-// Convert an RGB565 pixel buffer to RGB888 for OpenGL texture upload.
-static void convert_rgb565_to_rgb888(const uint8_t* src, uint8_t* dst, int pixels) {
-  const uint16_t* s = reinterpret_cast<const uint16_t*>(src);
-  for (int i = 0; i < pixels; i++) {
-    uint16_t p = s[i];
-    dst[i * 3 + 0] = ((p >> 11) & 0x1F) << 3;
-    dst[i * 3 + 1] = ((p >> 5) & 0x3F) << 2;
-    dst[i * 3 + 2] = (p & 0x1F) << 3;
-  }
 }
 
 // Background thread: read packets from serial/TCP, parse frame tiles and debug messages.

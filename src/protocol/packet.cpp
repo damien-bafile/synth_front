@@ -8,7 +8,7 @@
 #include "../serial/serial_port.h"
 
 // XOR-based checksum over a byte range.
-static uint8_t compute_checksum(const uint8_t* data, int len) {
+uint8_t compute_checksum(const uint8_t* data, int len) {
   uint8_t sum = 0;
   for (int i = 0; i < len; i++)
     sum ^= data[i];

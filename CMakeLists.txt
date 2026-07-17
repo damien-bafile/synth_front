@@ -63,6 +63,7 @@ set(SOURCES
   "${CMAKE_SOURCE_DIR}/src/main.cpp"
   "${CMAKE_SOURCE_DIR}/src/audio/audio.cpp"
   "${CMAKE_SOURCE_DIR}/src/input/input.cpp"
+  "${CMAKE_SOURCE_DIR}/src/protocol/convert.cpp"
   "${CMAKE_SOURCE_DIR}/src/protocol/framebuffer.cpp"
   "${CMAKE_SOURCE_DIR}/src/protocol/packet.cpp"
   "${CMAKE_SOURCE_DIR}/src/render/renderer.cpp"
@@ -133,11 +134,13 @@ set(TEST_SOURCES
   "${CMAKE_SOURCE_DIR}/tests/test_protocol.cpp"
   "${CMAKE_SOURCE_DIR}/tests/test_framebuffer.cpp"
   "${CMAKE_SOURCE_DIR}/tests/test_input.cpp"
+  "${CMAKE_SOURCE_DIR}/tests/test_convert.cpp"
 )
 
 add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES}
   "${CMAKE_SOURCE_DIR}/src/protocol/packet.cpp"
   "${CMAKE_SOURCE_DIR}/src/protocol/framebuffer.cpp"
+  "${CMAKE_SOURCE_DIR}/src/protocol/convert.cpp"
   "${CMAKE_SOURCE_DIR}/src/serial/serial_port.c"
   "${CMAKE_SOURCE_DIR}/src/input/input.cpp"
 )

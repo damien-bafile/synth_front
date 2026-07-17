@@ -89,3 +89,7 @@ void packet_send_transport(int fd, PacketType type);
 /// @param y      Touch Y coordinate.
 /// @param state  1 for press, 0 for release.
 void packet_send_touch(int fd, uint16_t x, uint16_t y, uint8_t state);
+
+/// Compute the XOR checksum over a byte range.
+/// Used internally by the encode/parse functions, exposed for testing.
+uint8_t compute_checksum(const uint8_t* data, int len);

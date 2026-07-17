@@ -64,7 +64,7 @@ This project aims to follow the C++ Core Guidelines where practical:
 `main.cpp` intentionally uses a few globals to share state between the main
 thread, serial thread, and MIDI callback:
 
-- `g_conn_fd` — connection file descriptor (serial writes guarded by `g_serial_mutex`).
+- `g_conn_fd` — connection file descriptor (all serial writes guarded by `g_serial_mutex`; the MIDI callback also locks the mutex before transport sends).
 - `g_running` — atomic flag used to stop the serial thread.
 - `g_midi_queue` / `g_midi_head` / `g_midi_tail` — lock-free SPSC ring buffer.
 
@@ -80,7 +80,7 @@ If you refactor this, prefer encapsulating the globals rather than adding more.
 | `src/input/` | SDL keycode → synth action mapping | Returns `InputResult` for main.cpp to route. |
 | `src/midi/` | Platform MIDI input | One of `_alsa`, `_coremidi`, `_win32` is compiled per platform. |
 | `src/audio/` | SDL3 audio passthrough | Plain C interface. |
-| `src/ui/` | (unused — ImGui configured in main.cpp) | |
+| `src/ui/` | Dear ImGui device control panels (playback/recording/serial device selection) | Called from main.cpp's ImGui frame. |
 
 ## Things to avoid
 

@@ -21,7 +21,7 @@ static InputResult make_encoder(uint8_t idx, int16_t delta) {
 }
 
 static InputResult empty() {
-  return {InputAction::KEY, 0, 0};
+  return {InputAction::NONE, 0, 0};
 }
 
 InputResult input_map_key(SDL_Keycode key, bool shift) {

@@ -11,9 +11,9 @@
 #include <atomic>
 
 static uint8_t g_fb[2][FB_RGB565_SIZE];
-static int g_cur = 0;
-static int g_width = 0;
-static int g_height = 0;
+static std::atomic<int> g_cur{0};
+static std::atomic<int> g_width{0};
+static std::atomic<int> g_height{0};
 static std::atomic<int> g_done{-1};
 
 // Reset framebuffer state for new dimensions; rejects sizes above the static limit.
@@ -21,10 +21,10 @@ bool framebuffer_init(int width, int height) {
   int pixels = width * height;
   if (pixels > FB_MAX_PIXELS)
     return false;
-  if (width != g_width || height != g_height) {
-    g_width = width;
-    g_height = height;
-    g_cur = 0;
+  if (width != g_width.load(std::memory_order_relaxed) || height != g_height.load(std::memory_order_relaxed)) {
+    g_width.store(width, std::memory_order_relaxed);
+    g_height.store(height, std::memory_order_relaxed);
+    g_cur.store(0, std::memory_order_relaxed);
     g_done.store(-1, std::memory_order_release);
   }
   return true;
@@ -33,10 +33,12 @@ bool framebuffer_init(int width, int height) {
 // Copy a tile's worth of RGB565 pixels into the active framebuffer.
 void framebuffer_write_tile(int tx, int ty, int tw, int th, const uint8_t* rgb565_data) {
   int row_bytes = tw * 2;
+  int stride = g_width.load(std::memory_order_relaxed);
+  int buf_idx = g_cur.load(std::memory_order_relaxed);
   const uint8_t* src = rgb565_data;
   for (int y = 0; y < th; y++) {
-    int dst_offs = ((ty + y) * g_width + tx) * 2;
-    std::memcpy(g_fb[g_cur] + dst_offs, src, row_bytes);
+    int dst_offs = ((ty + y) * stride + tx) * 2;
+    std::memcpy(g_fb[buf_idx] + dst_offs, src, row_bytes);
     src += row_bytes;
   }
 }
@@ -44,8 +46,8 @@ void framebuffer_write_tile(int tx, int ty, int tw, int th, const uint8_t* rgb56
 // Swap buffers: the current frame becomes available for reading, and writing continues on the
 // other.
 void framebuffer_finish_frame() {
-  int done = g_cur;
-  g_cur ^= 1;
+  int done = g_cur.load(std::memory_order_relaxed);
+  g_cur.store(done ^ 1, std::memory_order_relaxed);
   g_done.store(done, std::memory_order_release);
 }
 
@@ -53,7 +55,7 @@ void framebuffer_finish_frame() {
 void framebuffer_clear() {
   std::memset(g_fb[0], 0, FB_RGB565_SIZE);
   std::memset(g_fb[1], 0, FB_RGB565_SIZE);
-  g_cur = 0;
+  g_cur.store(0, std::memory_order_relaxed);
   g_done.store(0, std::memory_order_release);
 }
 
@@ -62,8 +64,10 @@ bool framebuffer_get(uint8_t* out, int* out_width, int* out_height) {
   int idx = g_done.exchange(-1, std::memory_order_acquire);
   if (idx < 0)
     return false;
-  std::memcpy(out, g_fb[idx], g_width * g_height * 2);
-  *out_width = g_width;
-  *out_height = g_height;
+  int w = g_width.load(std::memory_order_relaxed);
+  int h = g_height.load(std::memory_order_relaxed);
+  std::memcpy(out, g_fb[idx], w * h * 2);
+  *out_width = w;
+  *out_height = h;
   return true;
 }

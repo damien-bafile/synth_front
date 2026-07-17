@@ -58,7 +58,7 @@ src/midi/              — Platform MIDI input (CoreMIDI / ALSA / WinMM)
 src/protocol/          — Binary packet protocol + RGB565 framebuffer
 src/render/            — OpenGL 3.3 Core renderer
 src/serial/            — Cross-platform serial I/O + Teensy auto-detect
-src/ui/                — Nuklear immediate-mode GUI backend
+src/ui/                — Dear ImGui device control panels (playback/recording/serial)
 ```
 
 ### Data flow
@@ -70,7 +70,7 @@ src/ui/                — Nuklear immediate-mode GUI backend
    drains queued MIDI messages, and sends everything to the Teensy.
 3. Each frame the main thread copies the latest completed framebuffer, converts
    it to RGB888, uploads it to an OpenGL texture, and draws a letterboxed quad.
-4. An optional Nuklear overlay provides Restart / Close / Minimize controls.
+4. An optional Dear ImGui overlay provides device status, restart/close controls, and device selection tabs.
 
 ## Protocol
 

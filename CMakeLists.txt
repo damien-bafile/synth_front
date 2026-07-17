@@ -7,11 +7,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set(FETCHCONTENT_BASE_DIR "${CMAKE_SOURCE_DIR}/deps")
 
-# MSYS2/MinGW reports as "MSYS" but we want WIN32 behavior
+# MSYS2/MinGW reports as "MSYS"; treat it as Windows for library detection.
 if(CMAKE_SYSTEM_NAME STREQUAL "MSYS")
-  set(CMAKE_SYSTEM_NAME Windows CACHE STRING "" FORCE)
-  set(WIN32 TRUE CACHE BOOL "" FORCE)
-  set(UNIX FALSE CACHE BOOL "" FORCE)
+  set(CMAKE_SYSTEM_NAME "Windows")
+  set(WIN32 TRUE)
+  set(UNIX FALSE)
 endif()
 
 include(FetchContent)

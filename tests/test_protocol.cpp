@@ -101,7 +101,8 @@ TEST(ProtocolTest, ChecksumSelfInverse) {
   EXPECT_EQ(compute_checksum(with_csum, 5), 0);
 }
 
-// -- packet_send pipe tests -------------------------------------------------
+#ifndef _WIN32
+// -- packet_send pipe tests (POSIX only) ------------------------------------
 
 #include <unistd.h>
 
@@ -177,3 +178,4 @@ TEST(ProtocolTest, PacketSendTouchViaPipe) {
   for (size_t i = 0; i < written.size(); i++)
     EXPECT_EQ(written[i], expected[i]) << "byte " << i;
 }
+#endif

@@ -14,7 +14,6 @@
 #elif defined(_WIN32)
 #include <GL/glew.h>
 #else
-#define GL_GLEXT_PROTOTYPES 1
 #include <GL/glcorearb.h>
 #endif
 

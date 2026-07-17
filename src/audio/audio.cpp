@@ -129,7 +129,7 @@ static void SDLCALL capture_callback(void* userdata, SDL_AudioStream* stream, in
   if (additional_amount <= 0)
     return;
 
-  uint8_t buf[AUDIO_BUF_SIZE];
+  static uint8_t buf[AUDIO_BUF_SIZE];
   int remaining = additional_amount;
   while (remaining > 0) {
     int chunk = remaining;

@@ -10,6 +10,7 @@
 
 /// High-level action produced by pressing or releasing a key.
 enum class InputAction {
+  NONE,      ///< No action (unmapped key). Callers should ignore the result.
   KEY,       ///< A front-panel or UI key code (value holds the keycode).
   TRANSPORT, ///< A MIDI transport command (value holds the PacketType byte).
   NOTE,      ///< A musical note (value holds the MIDI note number).

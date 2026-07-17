@@ -13,6 +13,7 @@
 #include <thread>
 #include <atomic>
 #include <future>
+#include <memory>
 
 struct Win32MidiBackend {
   HMIDIIN handle = nullptr;        ///< Open WinMM MIDI input handle.
@@ -76,10 +77,8 @@ static void midi_thread_func(Win32MidiBackend* b) {
 }
 
 bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
-  auto* b = new Win32MidiBackend;
-  m->opaque = b;
-  m->cb = nullptr;
-  m->running = false;
+  auto b = std::make_unique<Win32MidiBackend>();
+  auto cb_ptr = std::make_unique<MidiCallback>(std::move(cb));
 
   // Pick the first device, or the first device whose name contains source_name.
   UINT num_devs = midiInGetNumDevs();
@@ -100,30 +99,21 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
     if (!found) {
       fprintf(stderr, "MIDI: no matching source \"%s\", running without MIDI input.\n",
               source_name);
-      delete b;
-      m->opaque = nullptr;
-      m->running = true;
       return true;
     }
   } else if (num_devs == 0) {
     fprintf(stderr, "MIDI: no MIDI input devices found, running without MIDI input.\n");
-    delete b;
-    m->opaque = nullptr;
-    m->running = true;
     return true;
   }
 
-  // Store the callback on the heap so its address remains stable for WinMM.
-  auto* cb_ptr = new MidiCallback(std::move(cb));
-  m->cb = cb_ptr;
-  b->cb_ptr = cb_ptr;
+  b->cb_ptr = cb_ptr.get();
   b->dev_id = dev_id;
 
   auto open_future = b->open_promise.get_future();
 
   // Start the message-pump thread and wait for it to finish opening the device.
   b->running.store(true, std::memory_order_release);
-  b->thread = std::thread(midi_thread_func, b);
+  b->thread = std::thread(midi_thread_func, b.get());
 
   MMRESULT result = open_future.get();
 
@@ -132,13 +122,11 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
     PostThreadMessage(b->thread_id, WM_QUIT, 0, 0);
     b->thread.join();
     fprintf(stderr, "MIDI: failed to open device (err %u)\n", result);
-    delete cb_ptr;
-    m->cb = nullptr;
-    delete b;
-    m->opaque = nullptr;
     return false;
   }
 
+  m->opaque = b.release();
+  m->cb = cb_ptr.release();
   m->running = true;
   return true;
 }

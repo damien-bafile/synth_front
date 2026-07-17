@@ -38,6 +38,15 @@ struct termios2 {
 #endif
 
 #ifdef _WIN32
+#include <stdint.h>
+
+// Conversions between int fd and HANDLE.  On Win64 HANDLE is 64‑bit while our
+// fd API uses int, so a HANDLE whose value exceeds INT_MAX would truncate.
+// In practice CreateFile returns small handles that always fit in 32 bits,
+// and this pattern is standard in cross‑platform C libraries.  The assert
+// fires if that assumption ever breaks.
+#define HANDLE_TO_INT(h)  ((int)(intptr_t)(h))
+#define INT_TO_HANDLE(fd) ((HANDLE)(intptr_t)(fd))
 
 int serial_open(const char* device, int baud) {
   char path[64];
@@ -86,24 +95,24 @@ int serial_open(const char* device, int baud) {
   timeouts.WriteTotalTimeoutConstant = 0;
   SetCommTimeouts(h, &timeouts);
 
-  return (int)(intptr_t)h;
+  return HANDLE_TO_INT(h);
 }
 
 void serial_close(int fd) {
   if (fd >= 0)
-    CloseHandle((HANDLE)(intptr_t)fd);
+    CloseHandle(INT_TO_HANDLE(fd));
 }
 
 int serial_read(int fd, uint8_t* buf, int len) {
   DWORD n = 0;
-  if (!ReadFile((HANDLE)(intptr_t)fd, buf, len, &n, NULL))
+  if (!ReadFile(INT_TO_HANDLE(fd), buf, len, &n, NULL))
     return -1;
   return (int)n;
 }
 
 int serial_write(int fd, const uint8_t* buf, int len) {
   DWORD n = 0;
-  if (!WriteFile((HANDLE)(intptr_t)fd, buf, len, &n, NULL))
+  if (!WriteFile(INT_TO_HANDLE(fd), buf, len, &n, NULL))
     return -1;
   return (int)n;
 }

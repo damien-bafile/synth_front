@@ -290,13 +290,31 @@ int main(int argc, char* argv[]) {
                     } else if (msg == 0xE0) {
                       type = PacketType::MIDI_PITCH_BEND;
                     } else if (status == 0xFA) {
-                      send_transport(g_conn_fd, PacketType::MIDI_START);
+                      {
+                        int fd = g_conn_fd.load(std::memory_order_relaxed);
+                        if (fd >= 0) {
+                          std::lock_guard<std::mutex> lock(g_serial_mutex);
+                          packet_send_transport(fd, PacketType::MIDI_START);
+                        }
+                      }
                       return;
                     } else if (status == 0xFB) {
-                      send_transport(g_conn_fd, PacketType::MIDI_CONTINUE);
+                      {
+                        int fd = g_conn_fd.load(std::memory_order_relaxed);
+                        if (fd >= 0) {
+                          std::lock_guard<std::mutex> lock(g_serial_mutex);
+                          packet_send_transport(fd, PacketType::MIDI_CONTINUE);
+                        }
+                      }
                       return;
                     } else if (status == 0xFC) {
-                      send_transport(g_conn_fd, PacketType::MIDI_STOP);
+                      {
+                        int fd = g_conn_fd.load(std::memory_order_relaxed);
+                        if (fd >= 0) {
+                          std::lock_guard<std::mutex> lock(g_serial_mutex);
+                          packet_send_transport(fd, PacketType::MIDI_STOP);
+                        }
+                      }
                       return;
                     } else {
                       return;
@@ -448,8 +466,10 @@ int main(int argc, char* argv[]) {
           break;
         }
         if ((mod & SDL_KMOD_CTRL) && (mod & SDL_KMOD_SHIFT) && event.key.key == SDLK_R) {
-          if (down)
+          if (down) {
+            std::lock_guard<std::mutex> lock(g_serial_mutex);
             packet_send(g_conn_fd, PacketType::RESET, nullptr, 0);
+          }
           break;
         }
         auto result = input_map_key(event.key.key, (mod & SDL_KMOD_SHIFT) != 0);
@@ -461,6 +481,8 @@ int main(int argc, char* argv[]) {
           break;
 
         switch (result.action) {
+        case InputAction::NONE:
+          break;
         case InputAction::KEY:
           send_key(g_conn_fd, result.value, down);
           break;
@@ -524,8 +546,10 @@ int main(int argc, char* argv[]) {
             if (ImGui::Button("Hide"))
               g_show_ui = false;
             ImGui::SameLine();
-            if (ImGui::Button("Restart"))
+            if (ImGui::Button("Restart")) {
+              std::lock_guard<std::mutex> lock(g_serial_mutex);
               packet_send(g_conn_fd, PacketType::RESET, nullptr, 0);
+            }
             ImGui::SameLine();
             if (ImGui::Button("Close"))
               running = false;

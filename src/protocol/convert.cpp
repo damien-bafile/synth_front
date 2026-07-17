@@ -4,11 +4,12 @@
 #include "convert.h"
 #include "../render/renderer.h"
 #include "framebuffer.h"
+#include <cstring>
 
 void convert_rgb565_to_rgb888(const uint8_t* src, uint8_t* dst, int pixels) {
-  const uint16_t* s = reinterpret_cast<const uint16_t*>(src);
   for (int i = 0; i < pixels; i++) {
-    uint16_t p = s[i];
+    uint16_t p;
+    std::memcpy(&p, src + i * 2, sizeof(p));
     dst[i * 3 + 0] = ((p >> 11) & 0x1F) << 3;
     dst[i * 3 + 1] = ((p >> 5) & 0x3F) << 2;
     dst[i * 3 + 2] = (p & 0x1F) << 3;

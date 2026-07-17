@@ -143,8 +143,7 @@ TEST(InputTest, CommaKey) {
 
 TEST(InputTest, PeriodKey) {
   auto r = input_map_key(SDLK_PERIOD, false);
-  EXPECT_EQ(r.action, InputAction::KEY);
-  EXPECT_EQ(r.value, 0);
+  EXPECT_EQ(r.action, InputAction::NONE);
 
   r = input_map_key(SDLK_PERIOD, true);
   EXPECT_EQ(r.value, 0x08);
@@ -152,6 +151,5 @@ TEST(InputTest, PeriodKey) {
 
 TEST(InputTest, UnknownKey) {
   auto r = input_map_key(SDLK_UNKNOWN, false);
-  EXPECT_EQ(r.action, InputAction::KEY);
-  EXPECT_EQ(r.value, 0);
+  EXPECT_EQ(r.action, InputAction::NONE);
 }

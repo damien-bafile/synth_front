@@ -11,6 +11,7 @@
 #include <cstring>
 #include <thread>
 #include <atomic>
+#include <memory>
 #include <unistd.h>
 
 struct AlsaMidiBackend {
@@ -92,17 +93,13 @@ static void alsa_midi_thread_func(AlsaMidiBackend* b) {
 }
 
 bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
-  auto* b = new AlsaMidiBackend;
-  m->opaque = b;
-  m->cb = nullptr;
-  m->running = false;
+  auto b = std::make_unique<AlsaMidiBackend>();
+  auto cb_ptr = std::make_unique<MidiCallback>(std::move(cb));
 
   // Open the ALSA sequencer and create an application port.
   int err = snd_seq_open(&b->seq, "default", SND_SEQ_OPEN_DUPLEX, 0);
   if (err < 0) {
     fprintf(stderr, "MIDI: failed to open ALSA sequencer: %s\n", snd_strerror(err));
-    delete b;
-    m->opaque = nullptr;
     return false;
   }
   snd_seq_set_client_name(b->seq, "synth_front");
@@ -113,15 +110,10 @@ bool midi_input_open(MidiInput* m, const char* source_name, MidiCallback cb) {
   if (b->port_id < 0) {
     fprintf(stderr, "MIDI: failed to create ALSA port\n");
     snd_seq_close(b->seq);
-    delete b;
-    m->opaque = nullptr;
     return false;
   }
 
-  // Store the callback on the heap so its address remains stable for the thread.
-  auto* cb_ptr = new MidiCallback(std::move(cb));
-  m->cb = cb_ptr;
-  b->cb_ptr = cb_ptr;
+  b->cb_ptr = cb_ptr.get();
 
   int my_client = snd_seq_client_id(b->seq);
 
@@ -190,8 +182,10 @@ done_searching:
   snd_seq_nonblock(b->seq, 1);
 
   b->running.store(true, std::memory_order_release);
-  b->thread = std::thread(alsa_midi_thread_func, b);
+  b->thread = std::thread(alsa_midi_thread_func, b.get());
 
+  m->opaque = b.release();
+  m->cb = cb_ptr.release();
   m->running = true;
   return true;
 }

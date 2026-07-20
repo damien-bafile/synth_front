@@ -39,6 +39,12 @@ int serial_read(int fd, uint8_t* buf, int len);
 /// @return    Number of bytes written, or -1 on error.
 int serial_write(int fd, const uint8_t* buf, int len);
 
+/// Set or clear the DTR (Data Terminal Ready) modem control line.
+/// @param fd    Open serial port descriptor.
+/// @param level 1 = assert DTR, 0 = clear DTR.
+/// @return 0 on success, -1 on error.
+int serial_set_dtr(int fd, int level);
+
 #ifdef __cplusplus
 }
 #endif

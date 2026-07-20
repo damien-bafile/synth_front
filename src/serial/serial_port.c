@@ -117,6 +117,12 @@ int serial_write(int fd, const uint8_t* buf, int len) {
   return (int)n;
 }
 
+int serial_set_dtr(int fd, int level) {
+  if (!EscapeCommFunction(INT_TO_HANDLE(fd), level ? SETDTR : CLRDTR))
+    return -1;
+  return 0;
+}
+
 #else
 
 // Map a numeric baud rate to the closest standard termios constant.
@@ -245,6 +251,19 @@ int serial_read(int fd, uint8_t* buf, int len) {
 
 int serial_write(int fd, const uint8_t* buf, int len) {
   return write(fd, buf, len);
+}
+
+int serial_set_dtr(int fd, int level) {
+  int flags;
+  if (ioctl(fd, TIOCMGET, &flags) < 0)
+    return -1;
+  if (level)
+    flags |= TIOCM_DTR;
+  else
+    flags &= ~TIOCM_DTR;
+  if (ioctl(fd, TIOCMSET, &flags) < 0)
+    return -1;
+  return 0;
 }
 
 #endif

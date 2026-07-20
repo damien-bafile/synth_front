@@ -228,6 +228,8 @@ int main(int argc, char* argv[]) {
   std::string port;
   std::string midi_source;
   std::string audio_output;
+  bool do_soft_reset = false;
+  bool do_hard_reset = false;
 
   for (int i = 1; i < argc; i++) {
     if (std::strcmp(argv[i], "--port") == 0 && i + 1 < argc) {
@@ -243,6 +245,15 @@ int main(int argc, char* argv[]) {
       midi_source = argv[++i];
     } else if (std::strcmp(argv[i], "--audio-output") == 0 && i + 1 < argc) {
       audio_output = argv[++i];
+    } else if (std::strcmp(argv[i], "--list-ports") == 0) {
+      auto ports = find_serial_ports();
+      for (const auto& p : ports)
+        fprintf(stdout, "%s\n", p.c_str());
+      return 0;
+    } else if (std::strcmp(argv[i], "--soft-reset") == 0) {
+      do_soft_reset = true;
+    } else if (std::strcmp(argv[i], "--hard-reset") == 0) {
+      do_hard_reset = true;
     } else if (std::strcmp(argv[i], "--list-audio") == 0) {
       SDL_Init(SDL_INIT_AUDIO);
       int count = 0;
@@ -260,6 +271,34 @@ int main(int argc, char* argv[]) {
       SDL_Quit();
       return 0;
     }
+  }
+
+  if (do_soft_reset && do_hard_reset) {
+    fprintf(stderr, "error: --soft-reset and --hard-reset are mutually exclusive\n");
+    return 1;
+  }
+
+  if (do_soft_reset || do_hard_reset) {
+    if (port.empty())
+      port = find_teensy_port();
+    if (port.empty()) {
+      fprintf(stderr, "error: no Teensy found\n");
+      return 1;
+    }
+    int fd = serial_open(port.c_str(), 2000000);
+    if (fd < 0) {
+      fprintf(stderr, "error: failed to open %s\n", port.c_str());
+      return 1;
+    }
+    if (do_soft_reset) {
+      packet_send(fd, PacketType::RESET, nullptr, 0);
+    } else {
+      serial_set_dtr(fd, 1);
+      SDL_Delay(100);
+      serial_set_dtr(fd, 0);
+    }
+    serial_close(fd);
+    return 0;
   }
 
   if (port.empty()) {

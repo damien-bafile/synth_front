@@ -18,6 +18,15 @@ build:
 run *args: build
     {{_path_prefix}}{{_binary}} {{args}}
 
+list-ports: build
+    {{_path_prefix}}{{_binary}} --list-ports
+
+soft-reset: build
+    {{_path_prefix}}{{_binary}} --soft-reset
+
+hard-reset: build
+    {{_path_prefix}}{{_binary}} --hard-reset
+
 list:
     @just --list
 

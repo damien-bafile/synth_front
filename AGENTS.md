@@ -90,14 +90,26 @@ If you refactor this, prefer encapsulating the globals rather than adding more.
 - Do not assume all MIDI source files compile on every platform; only one is
   active per build.
 
-## Useful debugging flags
+## Useful flags
 
 ```sh
 # List available MIDI inputs
 ./build/synth_front --list-midi
 
+# List detected serial ports
+./build/synth_front --list-ports
+
 # Connect to a specific serial port
 ./build/synth_front --port /dev/ttyACM0
+
+# Soft-reset the Teensy (sends PacketType::RESET)
+./build/synth_front --soft-reset
+
+# Hard-reset the Teensy (toggles DTR, triggers bootloader reset)
+./build/synth_front --hard-reset
+
+# Can combine --port with reset flags
+./build/synth_front --port /dev/ttyACM0 --hard-reset
 
 # Verbose ALSA MIDI debugging (Linux)
 ./build/synth_front --midi-source "some device"

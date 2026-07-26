@@ -3,6 +3,7 @@
 ///        Allows switching audio output and serial connection.
 
 #include "device_panel.h"
+#include "clock/midi_clock.h"
 #include "audio/audio.h"
 #include "serial/serial_port.h"
 #include "serial/usb_detect.h"
@@ -95,6 +96,11 @@ void RenderDeviceTabs(std::atomic<bool>& connected,
     ImGui::EndTabItem();
   }
 
+  if (ImGui::BeginTabItem("Clock")) {
+    RenderClockTab(nullptr);
+    ImGui::EndTabItem();
+  }
+
   if (ImGui::BeginTabItem("Serial")) {
     auto ports = find_serial_ports();
     std::string teensy = find_teensy_port();
@@ -125,4 +131,40 @@ void RenderDeviceTabs(std::atomic<bool>& connected,
     }
     ImGui::EndTabItem();
   }
+}
+
+void RenderClockTab(MidiClock* clock) {
+    if (!clock) return;
+
+    const char* modes[] = {"OFF", "MASTER", "SLAVE"};
+    ClockMode current = clock->mode();
+    int current_idx = static_cast<int>(current);
+    if (current_idx < 0 || current_idx > 2) current_idx = 0;
+
+    ImGui::Text("Clock Source");
+    ImGui::SameLine();
+    if (ImGui::Combo("##clocksrc", &current_idx, modes, IM_ARRAYSIZE(modes))) {
+        clock->set_mode(static_cast<ClockMode>(current_idx));
+    }
+
+    if (clock->mode() == ClockMode::MASTER) {
+        int bpm = clock->bpm();
+        ImGui::Text("BPM");
+        ImGui::SameLine();
+        if (ImGui::SliderInt("##bpm", &bpm, 20, 300)) {
+            clock->set_bpm(bpm);
+        }
+
+        if (ImGui::Button(clock->is_running() ? "Stop" : "Play")) {
+            if (clock->is_running())
+                clock->stop_transport();
+            else
+                clock->start_transport();
+        }
+    }
+
+    if (clock->mode() == ClockMode::SLAVE) {
+        int ebpm = clock->estimated_bpm();
+        ImGui::Text("Estimated BPM: %d", ebpm > 0 ? ebpm : 0);
+    }
 }

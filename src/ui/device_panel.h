@@ -10,3 +10,6 @@ void RenderDeviceTabs(
     std::atomic<bool>& connected,
     std::atomic<bool>& audio_active,
     std::atomic<int>& conn_fd);
+
+class MidiClock;
+void RenderClockTab(MidiClock* clock);

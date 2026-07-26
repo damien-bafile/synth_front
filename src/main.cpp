@@ -32,6 +32,7 @@
 #include "midi/midi_input.h"
 #include "audio/audio.h"
 #include "ui/device_panel.h"
+#include "clock/midi_clock.h"
 #include "imgui.h"
 #include "backends/imgui_impl_sdl3.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -42,6 +43,7 @@ static std::mutex g_serial_mutex;
 static std::atomic<bool> g_show_ui{false};
 static std::atomic<bool> g_connected{false};
 static std::atomic<bool> g_audio_active{false};
+static MidiClock g_midi_clock;
 static float g_ui_x = 0, g_ui_y = 0, g_ui_w = 640, g_ui_h = 50;
 
 struct MidiEvent {
@@ -191,6 +193,9 @@ static void serial_thread_func() {
         fprintf(stderr, "Teensy connected and ready.\n");
         g_connected.store(true, std::memory_order_release);
         break;
+      case PacketType::MIDI_CLOCK:
+        g_midi_clock.on_tick();
+        break;
       default:
         break;
       }
@@ -312,6 +317,8 @@ int main(int argc, char* argv[]) {
     if (g_conn_fd < 0)
       fprintf(stderr, "Failed to open serial port. Will auto-retry.\n");
   }
+
+  g_midi_clock.init(&g_conn_fd, &g_serial_mutex);
 
   MidiInput midi_in{};
   // Open MIDI input and route incoming messages to the serial packet queue.
@@ -595,6 +602,10 @@ int main(int argc, char* argv[]) {
             ImGui::EndTabItem();
           }
           RenderDeviceTabs(g_connected, g_audio_active, g_conn_fd);
+          if (ImGui::BeginTabItem("Clock")) {
+            RenderClockTab(&g_midi_clock);
+            ImGui::EndTabItem();
+          }
           ImGui::EndTabBar();
         }
 

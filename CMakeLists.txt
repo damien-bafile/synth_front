@@ -136,6 +136,7 @@ set(TEST_SOURCES
   "${CMAKE_SOURCE_DIR}/tests/test_framebuffer.cpp"
   "${CMAKE_SOURCE_DIR}/tests/test_input.cpp"
   "${CMAKE_SOURCE_DIR}/tests/test_convert.cpp"
+  "${CMAKE_SOURCE_DIR}/tests/test_midi_clock.cpp"
 )
 
 add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES}
@@ -144,6 +145,7 @@ add_executable(${PROJECT_NAME}_tests ${TEST_SOURCES}
   "${CMAKE_SOURCE_DIR}/src/protocol/convert.cpp"
   "${CMAKE_SOURCE_DIR}/src/serial/serial_port.c"
   "${CMAKE_SOURCE_DIR}/src/input/input.cpp"
+  "${CMAKE_SOURCE_DIR}/src/clock/midi_clock.cpp"
 )
 target_include_directories(${PROJECT_NAME}_tests PRIVATE "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(${PROJECT_NAME}_tests PRIVATE GTest::gtest_main SDL3::SDL3)

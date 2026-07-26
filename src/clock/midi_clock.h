@@ -27,6 +27,8 @@ public:
     void on_tick();
     int tick_count() const;
 
+    static uint32_t tick_interval_us(int bpm);
+
 private:
     void clock_thread_func();
 
@@ -41,8 +43,6 @@ private:
     uint32_t m_tick_intervals_us{0};
 
     std::thread m_clock_thread;
-
-    static uint32_t tick_interval_us(int bpm);
 
     std::atomic<int>* m_conn_fd{nullptr};
     std::mutex* m_serial_mutex{nullptr};

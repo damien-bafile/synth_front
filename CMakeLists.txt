@@ -62,6 +62,7 @@ set(IMGUI_SOURCES
 set(SOURCES
   "${CMAKE_SOURCE_DIR}/src/main.cpp"
   "${CMAKE_SOURCE_DIR}/src/audio/audio.cpp"
+  "${CMAKE_SOURCE_DIR}/src/clock/midi_clock.cpp"
   "${CMAKE_SOURCE_DIR}/src/input/input.cpp"
   "${CMAKE_SOURCE_DIR}/src/protocol/convert.cpp"
   "${CMAKE_SOURCE_DIR}/src/protocol/framebuffer.cpp"

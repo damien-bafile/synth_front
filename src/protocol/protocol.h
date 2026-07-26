@@ -18,6 +18,7 @@ enum class PacketType : uint8_t {
   KEY_UP   = 0x02,   ///< Physical/front-panel key released.
   ENCODER  = 0x05,   ///< Rotary encoder movement: payload [index, delta_hi, delta_lo].
   TOUCH    = 0x08,   ///< Touch-screen event: payload [x_hi, x_lo, y_hi, y_lo, state].
+  CLOCK_MODE = 0x0D, ///< Set Teensy MidiClock mode: payload [0=INTERNAL, 1=SLAVE].
 
   FRAME = 0x81,      ///< Legacy full-frame debug string (text payload).
   DEBUG = 0x82,      ///< Debug text line from the device.
@@ -28,6 +29,7 @@ enum class PacketType : uint8_t {
   MIDI_NOTE_OFF = 0x91,  ///< MIDI note off.
   MIDI_CC       = 0x92,  ///< MIDI control change.
   MIDI_PITCH_BEND = 0x93,///< MIDI pitch-bend change.
+  MIDI_CLOCK      = 0xF8, ///< MIDI timing clock tick (24 per quarter note).
 
   MIDI_START    = 0xFA,  ///< MIDI transport start.
   MIDI_CONTINUE = 0xFB,  ///< MIDI transport continue.

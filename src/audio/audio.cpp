@@ -9,7 +9,6 @@
 #include <SDL3/SDL.h>
 #include <cstdio>
 #include <cstring>
-#include <cstdlib>
 #include <string>
 
 static constexpr int AUDIO_BUF_SIZE = 4096;

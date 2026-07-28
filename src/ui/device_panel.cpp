@@ -96,11 +96,6 @@ void RenderDeviceTabs(std::atomic<bool>& connected,
     ImGui::EndTabItem();
   }
 
-  if (ImGui::BeginTabItem("Clock")) {
-    RenderClockTab(nullptr);
-    ImGui::EndTabItem();
-  }
-
   if (ImGui::BeginTabItem("Serial")) {
     auto ports = find_serial_ports();
     std::string teensy = find_teensy_port();
